@@ -1,12 +1,11 @@
 services:
   - type: web
-    name: peakcut
+    name: peakcut-app
     runtime: docker
-    plan: starter
-    disk:
-      name: peakcut-data
-      mountPath: /data
-      sizeGB: 10
+    plan: free
+    region: oregon
     envVars:
       - key: PEAKCUT_ACCOUNTS
         value: "0"
+      - key: PEAKCUT_HOST
+        value: "0.0.0.0"

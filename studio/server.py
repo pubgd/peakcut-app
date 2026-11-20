@@ -1339,6 +1339,29 @@ def remove_account(aid: str):
     return {"ok": True}
 
 
+@app.get("/api/debug/cookies")
+def debug_cookies():
+    from pathlib import Path
+    import os, shutil
+    paths = [Path("/etc/secrets/cookies.txt"), Path("cookies.txt"), config.DATA_DIR / "cookies.txt", config.ROOT / "cookies.txt", Path("/app/cookies.txt")]
+    found = {str(p): (p.is_file(), p.stat().st_size if p.is_file() else 0) for p in paths}
+    node = shutil.which("node")
+    deno = shutil.which("deno")
+    return {"found": found, "cwd": str(Path.cwd()), "node": str(node), "deno": str(deno), "files_in_cwd": [x.name for x in Path(".").iterdir()][:25]}
+
+
+@app.get("/api/debug/yt")
+def debug_yt(url: str = "https://youtu.be/7mjhCbFi9Wk"):
+    import yt_dlp
+    try:
+        with media._ydl({}) as ydl:
+            i = ydl.extract_info(url, download=False, process=False)
+            return {"title": i.get("title"), "cookiefile": ydl.params.get("cookiefile"), "formats": len(i.get("formats") or [])}
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "traceback": traceback.format_exc()[-1000:]}
+
+
 @app.post("/api/cookies")
 async def upload_cookies(request: Request, file: UploadFile = File(...)):
     _admin(request)

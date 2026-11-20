@@ -12,12 +12,12 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY studio studio
 COPY web web
-COPY cookies.txt* ./
 
 ENV PEAKCUT_DATA=/data \
     PEAKCUT_HOST=0.0.0.0 \
     PEAKCUT_PORT=8765 \
     PEAKCUT_TRUST_PROXY=1 \
+    PEAKCUT_YT_OAUTH2=1 \
     PYTHONUNBUFFERED=1
 VOLUME /data
 EXPOSE 8765

@@ -1386,8 +1386,10 @@ async def youtube_oauth_start(request: Request):
         global _oauth_state
         _oauth_state["running"] = True
         try:
+            import sys
+            import yt_dlp
             proc = subprocess.Popen(
-                ["yt-dlp", "--username", "oauth", "--password", "", "--no-warnings",
+                [sys.executable, "-m", "yt_dlp", "--username", "oauth", "--password", "", "--no-warnings",
                  "--print", "aftervideo:__url__", "https://www.youtube.com/watch?v=7mjhCbFi9Wk"],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
             )

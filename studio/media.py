@@ -20,7 +20,8 @@ NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 YT_PAUSE = 60
 _yt_refused_until = 0.0
 YT_BLOCKED = ("YouTube isn't letting PeakCut download videos right now. Upload the video file instead, or use a "
-              "Twitch or Kick link. YouTube links will be tried again in a few minutes.")
+              "Twitch or Kick link. An admin can fix this by adding YouTube cookies under Settings, Connected apps. "
+              "YouTube links will be tried again in a few minutes.")
 _BOT_CHECK = re.compile(r"not a bot|confirm you.?re not|sign in to confirm(?! your age)", re.I)
 # OAuth2 device flow asks the owner to approve on their phone; that is not a refusal, so do not pause YouTube.
 _OAUTH2_CHECK = re.compile(r"device code|go to https://www\.google\.com/device|verify you are a human", re.I)
@@ -111,6 +112,11 @@ class _Quiet:
     def error(self, m): pass
 
 
+def cookie_opts() -> dict:
+    """The YouTube cookies an admin saved (Settings, Connected apps), if any. yt-dlp only sends them to YouTube."""
+    return {"cookiefile": str(config.YT_COOKIES)} if config.YT_COOKIES.is_file() else {}
+
+
 def _ydl(opts):
     import shutil
     import yt_dlp
@@ -126,9 +132,9 @@ def _ydl(opts):
     elif deno:
         base["js_runtimes"] = {"deno": {"path": str(deno)}}
 
-    has_cookies = False
-    # Persistent data folder first (survives deploys), then the project root, then the baked-in copy.
-    # A baked-in cookies.txt in the image is stale after a redeploy; the data folder holds the current one.
+    # Cookies saved by an admin (Settings, Connected apps), plus the classic cookies.txt files.
+    base.update(cookie_opts())
+    has_cookies = bool(base.get("cookiefile"))
     for cp in (Path("/etc/secrets/cookies.txt"), config.DATA_DIR / "cookies.txt", config.ROOT / "cookies.txt", Path("cookies.txt")):
         if cp.is_file():
             base["cookiefile"] = str(cp)
@@ -196,9 +202,12 @@ def youtube_words(url: str):
     with _youtube_guard(url), _ydl({}) as ydl:
         i = ydl.extract_info(url, download=False, process=False)
         auto = i.get("automatic_captions") or {}
-        key = next((k for k in auto if k.endswith("-orig")), None)
-        if not key and i.get("language") in auto:
-            key = i["language"]
+        lang = str(i.get("language") or "").strip().lower()
+        base = lang.split("-")[0] if lang else ""
+        candidates = [f"{lang}-orig", lang, f"{base}-orig", base]
+        key = next((c for c in candidates if c and c in auto), None)
+        if not key:
+            key = next((k for k in auto if k.endswith("-orig")), None)
         track = next((f for f in auto.get(key) or [] if f.get("ext") == "json3" and f.get("url")), None) if key else None
         if not track:
             return None
@@ -383,11 +392,20 @@ def load_audio(wav: Path) -> np.ndarray:
     return data
 
 
+LOUDNESS_PIECE = 600       # seconds of audio worked out at a time
+
+
 def loudness_per_second(audio: np.ndarray) -> np.ndarray:
-    """RMS level in dB for each second of audio."""
+    """RMS level in dB for each second of audio.
+
+    Worked out ten minutes at a time. All at once, a day-long video needs a table of several gigabytes (one
+    float per sample), which most computers cannot find room for; this way it needs about 40 MB, whatever the length."""
     n = len(audio) // 16000
     if n == 0:
         return np.zeros(1, dtype=np.float32)
-    x = audio[: n * 16000].reshape(n, 16000).astype(np.float32) / 32768.0
-    rms = np.sqrt((x ** 2).mean(axis=1) + 1e-10)
-    return (20 * np.log10(rms)).astype(np.float32)
+    out = np.empty(n, dtype=np.float32)
+    for a in range(0, n, LOUDNESS_PIECE):
+        b = min(n, a + LOUDNESS_PIECE)
+        x = audio[a * 16000: b * 16000].reshape(b - a, 16000).astype(np.float32) / 32768.0
+        out[a:b] = 20 * np.log10(np.sqrt((x ** 2).mean(axis=1) + 1e-10))
+    return out

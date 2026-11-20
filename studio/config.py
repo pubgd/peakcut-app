@@ -124,6 +124,9 @@ FONTS_DIR = DATA_DIR / "fonts"          # caption fonts, copied from studio/font
 # YouTube already has a word-by-word transcript of most videos. With this on, that is what the AI reads to find the
 # clips (seconds instead of transcribing hours), and our own model is run only on the clips themselves.
 YT_TRANSCRIPT = env("PEAKCUT_YT_TRANSCRIPT", "1") != "0"
+# YouTube often refuses servers in data centres ("sign in to confirm you're not a bot"). Cookies from a signed-in
+# YouTube account get past that: an admin pastes them under Settings, Connected apps, and they are kept in this file.
+YT_COOKIES = Path(env("PEAKCUT_YT_COOKIES") or DATA_DIR / "youtube-cookies.txt")
 # YouTube OAuth2 device flow: the owner approves once on their phone, and the refresh token works from any
 # IP address, so cloud downloads are not refused as "not a bot". Turn it on with PEAKCUT_YT_OAUTH2=1.
 YT_OAUTH2 = env("PEAKCUT_YT_OAUTH2", "0") == "1"

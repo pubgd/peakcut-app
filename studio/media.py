@@ -17,7 +17,7 @@ NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 # YouTube sometimes refuses a server's downloads altogether ("sign in to confirm you're not a bot"). It is a
 # refusal of the server, not of one video, so once it happens YouTube links are turned away at once for a few
 # minutes, with a clear message, instead of each one waiting to fail. Then the next link simply tries again.
-YT_PAUSE = 600
+YT_PAUSE = 60
 _yt_refused_until = 0.0
 YT_BLOCKED = ("YouTube isn't letting PeakCut download videos right now. Upload the video file instead, or use a "
               "Twitch or Kick link. YouTube links will be tried again in a few minutes.")
@@ -101,10 +101,20 @@ def _ydl(opts):
     # a channel or playlist link is answered as "a list" straight away, never walked video by video
     base = {"noplaylist": True, "quiet": True, "no_warnings": True, "logger": _Quiet(),
             "extract_flat": "in_playlist", "playlistend": 1, "socket_timeout": 20,
-            "concurrent_fragment_downloads": 4}
+            "concurrent_fragment_downloads": 4,
+            "extractor_args": {"youtube": {"player_client": ["android", "ios", "mweb", "web"]}}}
     node = shutil.which("node") or (Path(r"C:\Program Files\nodejs\node.exe") if Path(r"C:\Program Files\nodejs\node.exe").is_file() else None)
+    deno = shutil.which("deno") or (Path("/usr/local/bin/deno") if Path("/usr/local/bin/deno").is_file() else None)
     if node:
         base["js_runtimes"] = {"node": {"path": str(node)}}
+    elif deno:
+        base["js_runtimes"] = {"deno": {"path": str(deno)}}
+
+    for cp in (Path("cookies.txt"), config.DATA_DIR / "cookies.txt"):
+        if cp.is_file():
+            base["cookiefile"] = str(cp)
+            break
+
     return yt_dlp.YoutubeDL({**base, **opts})
 
 

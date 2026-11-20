@@ -1365,6 +1365,25 @@ def debug_yt(url: str = "https://youtu.be/7mjhCbFi9Wk"):
         return {"error": str(e), "traceback": traceback.format_exc()[-1000:]}
 
 
+@app.get("/api/debug/yt-clients")
+def debug_yt_clients(url: str = "https://youtu.be/7mjhCbFi9Wk"):
+    """Try every YouTube player client. YouTube blocks some from data-centre IPs, but one usually works."""
+    import yt_dlp
+    clients = ["android_vr", "mweb", "tv_embedded", "web_embedded", "web_safari", "ios", "android", "visionos", "tv", "web"]
+    out = {}
+    for c in clients:
+        try:
+            opts = {"extractor_args": {"youtube": {"player_client": [c]}}, "quiet": True, "no_warnings": True,
+                    "socket_timeout": 15}
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                i = ydl.extract_info(url, download=False, process=False)
+            out[c] = {"ok": True, "title": (i.get("title") or "")[:60], "formats": len(i.get("formats") or [])}
+        except Exception as e:
+            msg = str(e).replace("\n", " ")[:150]
+            out[c] = {"ok": False, "error": msg}
+    return out
+
+
 _oauth_state = {"url": None, "running": False, "approved": False, "error": None}
 
 

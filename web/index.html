@@ -1515,7 +1515,8 @@ function drawShell() {  const nav = (v, icon, label, extra = "") => `<button cla
   }
   if (S.view === "overview" || S.view === "library") {
     const L = S.status.links || {};
-    act = (L.repo ? `<a class="btn" href="${esc(L.repo)}" target="_blank" rel="noopener" title="Star PeakCut on GitHub">${ic("github")}<span>Star<span class="long"> on GitHub</span></span></a>` : "")
+    act = `<button class="btn primary" data-act="pwa_install" id="pwa_install_btn" title="Install PeakCut as a mobile app">${ic("plus")}Install App</button>`
+        + (L.repo ? `<a class="btn" href="${esc(L.repo)}" target="_blank" rel="noopener" title="Star PeakCut on GitHub">${ic("github")}<span>Star<span class="long"> on GitHub</span></span></a>` : "")
         + (L.follow ? `<a class="btn primary" href="${esc(L.follow)}" target="_blank" rel="noopener" title="Follow the maker of PeakCut on Instagram">${ic("instagram")}Follow me</a>` : "");
   }
   const me = S.status.user;
@@ -2718,6 +2719,15 @@ document.addEventListener("click", async e => {
       b.disabled = false; return;
     }
     if (a === "tour") return startTour();
+    if (a === "pwa_install") {
+      if (window._pwaPrompt) {
+        window._pwaPrompt.prompt();
+        window._pwaPrompt.userChoice.then(() => { window._pwaPrompt = null; });
+      } else {
+        toast("Chrome me upar 3-dots (⋮) dabayein aur 'Install app' ya 'Add to Home screen' par click karein.", "ok");
+      }
+      return;
+    }
     if (a === "settab") { e.preventDefault(); S.stab = d.k; remember("settings", d.k); return drawSettings(); }
     if (a === "updhow") return updateHow();
     if (a === "updlater") { try { localStorage.setItem("peakcut_update_seen", S.status.update?.latest || ""); } catch {} return drawShell(); }
@@ -2812,6 +2822,10 @@ $("#main").addEventListener("scroll", () => $(".topbar").classList.toggle("stuck
       toast("Link loaded from Share. Press Make clips.", "ok");
     }
   } catch {}
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    window._pwaPrompt = e;
+  });
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
   }

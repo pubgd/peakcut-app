@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: peakcut
+    runtime: docker
+    plan: starter
+    disk:
+      name: peakcut-data
+      mountPath: /data
+      sizeGB: 10
+    envVars:
+      - key: PEAKCUT_ACCOUNTS
+        value: "0"

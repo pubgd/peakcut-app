@@ -96,15 +96,27 @@ class _Quiet:
 
 
 def _ydl(opts):
+    import shutil
     import yt_dlp
     # a channel or playlist link is answered as "a list" straight away, never walked video by video
-    return yt_dlp.YoutubeDL({"noplaylist": True, "quiet": True, "no_warnings": True, "logger": _Quiet(),
-                             "extract_flat": "in_playlist", "playlistend": 1, "socket_timeout": 20,
-                             "concurrent_fragment_downloads": 4, **opts})
+    base = {"noplaylist": True, "quiet": True, "no_warnings": True, "logger": _Quiet(),
+            "extract_flat": "in_playlist", "playlistend": 1, "socket_timeout": 20,
+            "concurrent_fragment_downloads": 4}
+    node = shutil.which("node") or (Path(r"C:\Program Files\nodejs\node.exe") if Path(r"C:\Program Files\nodejs\node.exe").is_file() else None)
+    if node:
+        base["js_runtimes"] = {"node": {"path": str(node)}}
+    return yt_dlp.YoutubeDL({**base, **opts})
 
 
 def _video_format(height):
     return f"bv*[height<={height}][vcodec^=avc1]+ba[ext=m4a]/bv*[height<={height}]+ba/b[height<={height}]/b"
+
+
+def _section_format(height):
+    # Segmented formats (m3u8) let ffmpeg seek directly to time slices without downloading entire monolithic streams
+    return (f"bv*[height<={height}][protocol^=m3u8]+ba[protocol^=m3u8]/"
+            f"bv*[height<={height}][vcodec^=avc1]+ba[ext=m4a]/"
+            f"bv*[height<={height}]+ba/b[height<={height}]/b")
 
 
 def _biggest(job_dir: Path, stem: str) -> Path:
@@ -268,7 +280,7 @@ def download_section(url: str, out_dir: Path, stem: str, start: float, end: floa
     exact=True the cut is made at exactly `start` instead (slower), for when there is nothing to match against."""
     from yt_dlp.utils import download_range_func
     out_dir.mkdir(parents=True, exist_ok=True)
-    opts = {"format": _video_format(height), "merge_output_format": "mp4", "outtmpl": str(out_dir / (stem + ".%(ext)s")),
+    opts = {"format": _section_format(height), "merge_output_format": "mp4", "outtmpl": str(out_dir / (stem + ".%(ext)s")),
             "download_ranges": download_range_func(None, [(max(0.0, start), end)])}
     if exact:
         opts["force_keyframes_at_cuts"] = True

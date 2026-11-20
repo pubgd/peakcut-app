@@ -1,0 +1,10 @@
+<resources>
+    <style name="Theme.PeakCut" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#FF8B33</item>
+        <item name="colorPrimaryVariant">#F27A1F</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="android:statusBarColor">#1E1612</item>
+        <item name="android:navigationBarColor">#1E1612</item>
+        <item name="android:windowBackground">#1E1612</item>
+    </style>
+</resources>

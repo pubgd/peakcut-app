@@ -2,9 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>PeakCut</title>
 <link rel="icon" type="image/svg+xml" href="/brand/favicon.svg">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#FF8B33">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PeakCut">
+<link rel="apple-touch-icon" href="/brand/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Inter:wght@300&family=Archivo+Black&family=Anton&family=Poppins:wght@800&display=swap" rel="stylesheet">
@@ -2792,6 +2799,22 @@ $("#main").addEventListener("scroll", () => $(".topbar").classList.toggle("stuck
     const link = sessionStorage.getItem("peakcut_link");
     if (link) { sessionStorage.removeItem("peakcut_link"); go("overview"); $("#url").value = link; onLink($("#url")); $("#url").focus(); toast("Your link is ready. Press Make clips.", "ok"); }
   } catch {}
+  try {  // link shared from mobile YouTube app (Web Share Target / Intent)
+    const shared = q.get("url") || q.get("text");
+    if (shared) {
+      const m = shared.match(/https?:\/\/[^\s]+/);
+      const targetUrl = m ? m[0] : shared;
+      history.replaceState(null, "", location.pathname);
+      go("overview");
+      $("#url").value = targetUrl;
+      onLink($("#url"));
+      $("#url").focus();
+      toast("Link loaded from Share. Press Make clips.", "ok");
+    }
+  } catch {}
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  }
   loop();
   if (S.status.tour && !$("#formdlg").open) setTimeout(startTour, 500);   // once, the first time someone signs in
   checkNew(true);

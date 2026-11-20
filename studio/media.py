@@ -102,7 +102,7 @@ def _ydl(opts):
     base = {"noplaylist": True, "quiet": True, "no_warnings": True, "logger": _Quiet(),
             "extract_flat": "in_playlist", "playlistend": 1, "socket_timeout": 20,
             "concurrent_fragment_downloads": 4,
-            "extractor_args": {"youtube": {"player_client": ["android", "ios", "mweb", "web"]}}}
+            "extractor_args": {"youtube": {"player_client": ["android", "visionos"]}}}
     node = shutil.which("node") or (Path(r"C:\Program Files\nodejs\node.exe") if Path(r"C:\Program Files\nodejs\node.exe").is_file() else None)
     deno = shutil.which("deno") or (Path("/usr/local/bin/deno") if Path("/usr/local/bin/deno").is_file() else None)
     if node:
@@ -140,7 +140,13 @@ def _biggest(job_dir: Path, stem: str) -> Path:
 def info(url: str) -> dict:
     """Title, channel and length, without downloading anything."""
     with _youtube_guard(url), _ydl({}) as ydl:
-        i = ydl.extract_info(url, download=False)
+        try:
+            i = ydl.extract_info(url, download=False)
+        except Exception as e:
+            msg = str(e).lower()
+            if "video is unavailable" in msg or "not available" in msg:
+                raise ValueError("This video is unavailable or private on YouTube. Check the link.") from None
+            raise
     return {"title": i.get("title") or "", "uploader": i.get("uploader") or i.get("channel") or "",
             "duration": float(i.get("duration") or 0), "is_live": bool(i.get("is_live")),
             "thumbnail": i.get("thumbnail") or "", "kind": i.get("_type") or "video"}

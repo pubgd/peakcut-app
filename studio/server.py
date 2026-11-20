@@ -1370,14 +1370,15 @@ _oauth_state = {"url": None, "running": False, "approved": False, "error": None}
 
 @app.get("/api/youtube/oauth/start")
 async def youtube_oauth_start(request: Request):
-    """Begin YouTube OAuth2 device flow. The owner opens the returned URL on their phone, approves, and
-    yt-dlp stores the refresh token. It works from any IP address afterwards, so cloud downloads are
-    not refused as "not a bot" the way browser cookies are."""
+    """Begin YouTube OAuth2 device flow. Returns a Google device URL to open on your phone. Once approved,
+    yt-dlp stores a refresh token and YouTube downloads work from any IP address — no more "not a bot"
+    blocks on Render."""
     global _oauth_state
     _admin(request)
     if _oauth_state["running"]:
         return {"ok": True, "url": _oauth_state["url"], "approved": _oauth_state["approved"],
                 "message": "Already running. Open the URL on your phone if you have not already."}
+
     import subprocess
     import threading
     import re
@@ -1393,10 +1394,12 @@ async def youtube_oauth_start(request: Request):
                  "--print", "aftervideo:__url__", "https://www.youtube.com/watch?v=7mjhCbFi9Wk"],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
             )
+            url_seen = False
             for line in iter(proc.stderr.readline, ""):
                 m = re.search(r"https://www\.google\.com/device\?[^\s\"']+", line)
-                if m:
+                if m and not url_seen:
                     _oauth_state["url"] = m.group(0)
+                    url_seen = True
             proc.wait(timeout=180)
             if proc.returncode == 0:
                 _oauth_state["approved"] = True
@@ -1408,7 +1411,18 @@ async def youtube_oauth_start(request: Request):
             _oauth_state["running"] = False
 
     threading.Thread(target=run_oauth, daemon=True).start()
-    return {"ok": True, "message": "Open the URL below on your phone and approve. It works from any IP."}
+
+    # Wait up to 12 seconds for yt-dlp to print the device URL.
+    import time as _time
+    for _ in range(24):
+        if _oauth_state["url"]:
+            break
+        _time.sleep(0.5)
+
+    if _oauth_state["url"]:
+        return {"ok": True, "url": _oauth_state["url"],
+                "message": "Open this URL on your phone, enter the code, and approve."}
+    return {"ok": False, "error": "yt-dlp did not return a device URL yet. Try again."}
 
 
 @app.get("/api/youtube/oauth/status")

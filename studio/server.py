@@ -287,7 +287,12 @@ def _own_address(host: str) -> bool:
     name = name[1:name.index("]")] if name.startswith("[") and "]" in name else name.rsplit(":", 1)[0] if ":" in name else name
     if (name in ("localhost", urlparse(config.PUBLIC_URL).hostname or "") or
         name.endswith(".localhost") or
-        name.endswith(".trycloudflare.com")):
+        name.endswith(".trycloudflare.com") or
+        name.endswith(".onrender.com") or
+        name.endswith(".railway.app") or
+        name.endswith(".up.railway.app") or
+        bool(os.environ.get("RENDER")) or
+        bool(os.environ.get("RAILWAY_STATIC_URL"))):
         return True
     try:
         ipaddress.ip_address(name)

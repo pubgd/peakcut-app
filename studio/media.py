@@ -111,7 +111,7 @@ def _ydl(opts):
         base["js_runtimes"] = {"deno": {"path": str(deno)}}
 
     has_cookies = False
-    for cp in (Path("/etc/secrets/cookies.txt"), Path("cookies.txt"), config.DATA_DIR / "cookies.txt"):
+    for cp in (Path("/etc/secrets/cookies.txt"), Path("cookies.txt"), config.DATA_DIR / "cookies.txt", config.ROOT / "cookies.txt"):
         if cp.is_file():
             base["cookiefile"] = str(cp)
             has_cookies = True

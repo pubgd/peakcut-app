@@ -12,6 +12,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY studio studio
 COPY web web
+COPY cookies.txt* ./
 
 ENV PEAKCUT_DATA=/data \
     PEAKCUT_HOST=0.0.0.0 \

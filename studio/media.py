@@ -42,8 +42,22 @@ def youtube_paused() -> bool:
 
 def check_youtube(url: str):
     """Raise YouTubeBlocked straight away if YouTube is refusing this server right now."""
-    if is_youtube(url) and youtube_paused():
+    if is_youtube(url) and youtube_paused() and not oauth2_ready():
         raise YouTubeBlocked(YT_BLOCKED)
+
+
+def oauth2_ready() -> bool:
+    """Has the owner approved the OAuth2 device flow yet? When yes, YouTube downloads work from any IP."""
+    if not config.YT_OAUTH2:
+        return False
+    # yt-dlp stores the OAuth2 token in its cache dir; if it is there, the owner has approved.
+    for p in (Path("/root/.cache/yt-dlp/oauth2.txt"),
+              Path("/home/.cache/yt-dlp/oauth2.txt"),
+              config.DATA_DIR / "oauth2.txt",
+              config.DATA_DIR / "yt-dlp" / "oauth2.txt"):
+        if p.is_file():
+            return True
+    return False
 
 
 def note_refusal(url: str, err) -> bool:

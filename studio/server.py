@@ -1354,7 +1354,10 @@ def debug_cookies():
 def debug_yt(url: str = "https://youtu.be/7mjhCbFi9Wk"):
     import yt_dlp
     try:
-        with media._ydl({}) as ydl:
+        opts = {}
+        if config.YT_OAUTH2:
+            opts = {"username": "oauth", "password": ""}
+        with media._ydl(opts) as ydl:
             i = ydl.extract_info(url, download=False, process=False)
             return {"title": i.get("title"), "cookiefile": ydl.params.get("cookiefile"), "formats": len(i.get("formats") or [])}
     except Exception as e:
@@ -1362,20 +1365,56 @@ def debug_yt(url: str = "https://youtu.be/7mjhCbFi9Wk"):
         return {"error": str(e), "traceback": traceback.format_exc()[-1000:]}
 
 
-@app.post("/api/youtube/oauth/start")
+_oauth_state = {"url": None, "running": False, "approved": False, "error": None}
+
+
+@app.get("/api/youtube/oauth/start")
 async def youtube_oauth_start(request: Request):
     """Begin YouTube OAuth2 device flow. The owner opens the returned URL on their phone, approves, and
     yt-dlp stores the refresh token. It works from any IP address afterwards, so cloud downloads are
     not refused as "not a bot" the way browser cookies are."""
+    global _oauth_state
     _admin(request)
+    if _oauth_state["running"]:
+        return {"ok": True, "url": _oauth_state["url"], "approved": _oauth_state["approved"],
+                "message": "Already running. Open the URL on your phone if you have not already."}
     import subprocess
-    try:
-        p = subprocess.run(["yt-dlp", "--username", "oauth", "--password", "", "--print", "aftervideo:__url__",
-                            "https://www.youtube.com/watch?v=7mjhCbFi9Wk"],
-                           capture_output=True, text=True, timeout=120)
-        return {"ok": True, "stdout": p.stdout[-500:], "stderr": p.stderr[-500:]}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+    import threading
+    import re
+
+    def run_oauth():
+        global _oauth_state
+        _oauth_state["running"] = True
+        try:
+            proc = subprocess.Popen(
+                ["yt-dlp", "--username", "oauth", "--password", "", "--no-warnings",
+                 "--print", "aftervideo:__url__", "https://www.youtube.com/watch?v=7mjhCbFi9Wk"],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            )
+            for line in iter(proc.stderr.readline, ""):
+                m = re.search(r"https://www\.google\.com/device\?[^\s\"']+", line)
+                if m:
+                    _oauth_state["url"] = m.group(0)
+            proc.wait(timeout=180)
+            if proc.returncode == 0:
+                _oauth_state["approved"] = True
+            else:
+                _oauth_state["error"] = (proc.stderr.read() or "unknown error")[-300:]
+        except Exception as e:
+            _oauth_state["error"] = str(e)
+        finally:
+            _oauth_state["running"] = False
+
+    threading.Thread(target=run_oauth, daemon=True).start()
+    return {"ok": True, "message": "Open the URL below on your phone and approve. It works from any IP."}
+
+
+@app.get("/api/youtube/oauth/status")
+async def youtube_oauth_status(request: Request):
+    """Check whether the owner has approved the OAuth2 device flow yet."""
+    _admin(request)
+    return {"ok": True, "url": _oauth_state.get("url"), "approved": _oauth_state.get("approved"),
+            "running": _oauth_state.get("running"), "error": _oauth_state.get("error")}
 
 
 @app.post("/api/cookies")

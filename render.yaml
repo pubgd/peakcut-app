@@ -9,3 +9,5 @@ services:
         value: "0"
       - key: PEAKCUT_HOST
         value: "0.0.0.0"
+      - key: PEAKCUT_YT_OAUTH2
+        value: "1"

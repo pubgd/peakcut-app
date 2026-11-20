@@ -102,7 +102,7 @@ def _ydl(opts):
     base = {"noplaylist": True, "quiet": True, "no_warnings": True, "logger": _Quiet(),
             "extract_flat": "in_playlist", "playlistend": 1, "socket_timeout": 20,
             "concurrent_fragment_downloads": 4,
-            "extractor_args": {"youtube": {"player_client": ["android", "visionos"]}}}
+            "remote_components": ["ejs:github"]}
     node = shutil.which("node") or (Path(r"C:\Program Files\nodejs\node.exe") if Path(r"C:\Program Files\nodejs\node.exe").is_file() else None)
     deno = shutil.which("deno") or (Path("/usr/local/bin/deno") if Path("/usr/local/bin/deno").is_file() else None)
     if node:
@@ -110,10 +110,15 @@ def _ydl(opts):
     elif deno:
         base["js_runtimes"] = {"deno": {"path": str(deno)}}
 
+    has_cookies = False
     for cp in (Path("/etc/secrets/cookies.txt"), Path("cookies.txt"), config.DATA_DIR / "cookies.txt"):
         if cp.is_file():
             base["cookiefile"] = str(cp)
+            has_cookies = True
             break
+
+    if not has_cookies:
+        base["extractor_args"] = {"youtube": {"player_client": ["android", "visionos"]}}
 
     return yt_dlp.YoutubeDL({**base, **opts})
 
@@ -144,7 +149,7 @@ def info(url: str) -> dict:
             i = ydl.extract_info(url, download=False)
         except Exception as e:
             msg = str(e).lower()
-            if "video is unavailable" in msg or "not available" in msg:
+            if "this video is unavailable" in msg or "video unavailable" in msg or "private video" in msg:
                 raise ValueError("This video is unavailable or private on YouTube. Check the link.") from None
             raise
     return {"title": i.get("title") or "", "uploader": i.get("uploader") or i.get("channel") or "",

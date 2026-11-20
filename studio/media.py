@@ -22,6 +22,8 @@ _yt_refused_until = 0.0
 YT_BLOCKED = ("YouTube isn't letting PeakCut download videos right now. Upload the video file instead, or use a "
               "Twitch or Kick link. YouTube links will be tried again in a few minutes.")
 _BOT_CHECK = re.compile(r"not a bot|confirm you.?re not|sign in to confirm(?! your age)", re.I)
+# OAuth2 device flow asks the owner to approve on their phone; that is not a refusal, so do not pause YouTube.
+_OAUTH2_CHECK = re.compile(r"device code|go to https://www\.google\.com/device|verify you are a human", re.I)
 
 
 class YouTubeBlocked(RuntimeError):
@@ -47,7 +49,7 @@ def check_youtube(url: str):
 def note_refusal(url: str, err) -> bool:
     """If this error is YouTube refusing the server, pause YouTube links for a while. True if it was."""
     global _yt_refused_until
-    if is_youtube(url) and _BOT_CHECK.search(str(err)):
+    if is_youtube(url) and _BOT_CHECK.search(str(err)) and not _OAUTH2_CHECK.search(str(err)):
         _yt_refused_until = time.time() + YT_PAUSE
         return True
     return False
@@ -118,6 +120,18 @@ def _ydl(opts):
             base["cookiefile"] = str(cp)
             has_cookies = True
             break
+
+    # YouTube OAuth2 device flow: a one-time approve on the owner's phone gives a refresh token that
+    # works from any IP address, so cloud datacentre downloads are not refused as "not a bot".
+    if not has_cookies and config.YT_OAUTH2:
+        base["username"] = "oauth"
+        base["password"] = ""
+        base["extractor_args"] = {"youtube": {"player_client": ["android", "visionos"]}}
+        has_cookies = True
+
+    # A residential proxy routes YouTube requests through a home IP, which is never refused as a bot.
+    if not has_cookies and config.YT_PROXY:
+        base["proxy"] = config.YT_PROXY
 
     if not has_cookies:
         base["extractor_args"] = {"youtube": {"player_client": ["android", "visionos"]}}

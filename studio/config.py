@@ -124,6 +124,12 @@ FONTS_DIR = DATA_DIR / "fonts"          # caption fonts, copied from studio/font
 # YouTube already has a word-by-word transcript of most videos. With this on, that is what the AI reads to find the
 # clips (seconds instead of transcribing hours), and our own model is run only on the clips themselves.
 YT_TRANSCRIPT = env("PEAKCUT_YT_TRANSCRIPT", "1") != "0"
+# YouTube OAuth2 device flow: the owner approves once on their phone, and the refresh token works from any
+# IP address, so cloud downloads are not refused as "not a bot". Turn it on with PEAKCUT_YT_OAUTH2=1.
+YT_OAUTH2 = env("PEAKCUT_YT_OAUTH2", "0") == "1"
+# A residential or mobile proxy URL (e.g. http://user:pass@host:port) makes yt-dlp fetch YouTube
+# through a home IP, which is never refused as a bot. Set PEAKCUT_YT_PROXY to enable it.
+YT_PROXY = env("PEAKCUT_YT_PROXY", "").strip()
 # the compact model for processors; a machine with a graphics card sets PEAKCUT_ASR_MODEL to the full-precision one
 ASR_MODEL_NAME = env("PEAKCUT_ASR_MODEL", "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8")
 ASR_MODEL_DIR = MODELS_DIR / ASR_MODEL_NAME

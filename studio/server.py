@@ -1362,6 +1362,22 @@ def debug_yt(url: str = "https://youtu.be/7mjhCbFi9Wk"):
         return {"error": str(e), "traceback": traceback.format_exc()[-1000:]}
 
 
+@app.post("/api/youtube/oauth/start")
+async def youtube_oauth_start(request: Request):
+    """Begin YouTube OAuth2 device flow. The owner opens the returned URL on their phone, approves, and
+    yt-dlp stores the refresh token. It works from any IP address afterwards, so cloud downloads are
+    not refused as "not a bot" the way browser cookies are."""
+    _admin(request)
+    import subprocess
+    try:
+        p = subprocess.run(["yt-dlp", "--username", "oauth", "--password", "", "--print", "aftervideo:__url__",
+                            "https://www.youtube.com/watch?v=7mjhCbFi9Wk"],
+                           capture_output=True, text=True, timeout=120)
+        return {"ok": True, "stdout": p.stdout[-500:], "stderr": p.stderr[-500:]}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 @app.post("/api/cookies")
 async def upload_cookies(request: Request, file: UploadFile = File(...)):
     _admin(request)

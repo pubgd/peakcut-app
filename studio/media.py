@@ -146,7 +146,7 @@ def info(url: str) -> dict:
     """Title, channel and length, without downloading anything."""
     with _youtube_guard(url), _ydl({}) as ydl:
         try:
-            i = ydl.extract_info(url, download=False)
+            i = ydl.extract_info(url, download=False, process=False)
         except Exception as e:
             msg = str(e).lower()
             if "this video is unavailable" in msg or "video unavailable" in msg or "private video" in msg:
@@ -164,7 +164,7 @@ def youtube_words(url: str):
         return None
     import json
     with _youtube_guard(url), _ydl({}) as ydl:
-        i = ydl.extract_info(url, download=False)
+        i = ydl.extract_info(url, download=False, process=False)
         auto = i.get("automatic_captions") or {}
         key = next((k for k in auto if k.endswith("-orig")), None)
         if not key and i.get("language") in auto:
@@ -183,7 +183,7 @@ def youtube_english_words(url: str):
         return None
     import json
     with _youtube_guard(url), _ydl({}) as ydl:
-        i = ydl.extract_info(url, download=False)
+        i = ydl.extract_info(url, download=False, process=False)
         tracks = []
         for group in (i.get("subtitles") or {}, i.get("automatic_captions") or {}):
             for k in ("en", "en-US", "en-GB"):

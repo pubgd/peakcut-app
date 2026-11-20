@@ -709,8 +709,8 @@ def link_preview(request: Request, url: str = ""):
         raise HTTPException(422, str(e))
     except HTTPException:
         raise
-    except Exception:
-        raise HTTPException(422, "Couldn't open that video. Check the link is public and complete.")
+    except Exception as e:
+        raise HTTPException(422, str(e) if str(e) else "Couldn't open that video. Check the link is public and complete.")
 
 
 @app.post("/api/jobs")

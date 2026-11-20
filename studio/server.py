@@ -1339,6 +1339,28 @@ def remove_account(aid: str):
     return {"ok": True}
 
 
+@app.post("/api/cookies")
+async def upload_cookies(request: Request, file: UploadFile = File(...)):
+    _admin(request)
+    contents = await file.read()
+    if len(contents) > 2_000_000:
+        raise HTTPException(400, "Cookie file is too large.")
+    (config.DATA_DIR / "cookies.txt").write_bytes(contents)
+    (config.ROOT / "cookies.txt").write_bytes(contents)
+    return {"ok": True, "size": len(contents)}
+
+
+@app.put("/api/cookies")
+def set_cookies_text(request: Request, body: dict = Body(...)):
+    _admin(request)
+    text = body.get("cookies", "").strip()
+    if len(text) > 2_000_000:
+        raise HTTPException(400, "Cookie data is too large.")
+    (config.DATA_DIR / "cookies.txt").write_text(text, encoding="utf-8")
+    (config.ROOT / "cookies.txt").write_text(text, encoding="utf-8")
+    return {"ok": True, "size": len(text)}
+
+
 # ---------------------------------------------------------------- connecting YouTube, Instagram and TikTok
 # Connect sends the browser to the platform's own sign-in page; the platform sends it back here, and the person lands
 # on Settings, Connected apps, with the account added (or a message saying what went wrong).

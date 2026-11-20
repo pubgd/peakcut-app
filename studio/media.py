@@ -110,7 +110,7 @@ def _ydl(opts):
     elif deno:
         base["js_runtimes"] = {"deno": {"path": str(deno)}}
 
-    for cp in (Path("cookies.txt"), config.DATA_DIR / "cookies.txt"):
+    for cp in (Path("/etc/secrets/cookies.txt"), Path("cookies.txt"), config.DATA_DIR / "cookies.txt"):
         if cp.is_file():
             base["cookiefile"] = str(cp)
             break

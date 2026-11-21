@@ -68,6 +68,16 @@ def _startup():
     render.install_fonts()
     if _tools.missing():
         print("\n  " + _tools.HELP + "\n", flush=True)
+    # If YouTube cookies were passed as an env variable (PEAKCUT_YT_COOKIES_TEXT), write them to
+    # the cookies file on startup.  This keeps cookies alive across Render deploys without a disk.
+    _yt_cookies_text = config.env("PEAKCUT_YT_COOKIES_TEXT", "")
+    if _yt_cookies_text and not config.YT_COOKIES.is_file():
+        try:
+            config.YT_COOKIES.parent.mkdir(parents=True, exist_ok=True)
+            text = _yt_cookies_text if _yt_cookies_text.startswith("# Netscape") else "# Netscape HTTP Cookie File\n" + _yt_cookies_text
+            config.YT_COOKIES.write_text(text, encoding="utf-8")
+        except OSError:
+            pass
     if not transcribe.REMOTE and config.env("PEAKCUT_FETCH_MODEL", "1") != "0":     # the speech model: fetched now, in the background, if it was never downloaded
         from . import fetch_model
         threading.Thread(target=lambda: _quiet(fetch_model.ensure), daemon=True).start()
@@ -103,8 +113,10 @@ class Gate:
             # Only the upload may be big. Everything else is a small form, and is cut off at 256 KB whatever its
             # headers claim, so nobody can fill the server's memory by posting junk (signed in or not).
             piece = method == "PUT" and path.startswith("/api/upload/")
+            # YouTube cookies can be a few hundred KB; allow 2 MB for that endpoint specifically.
+            cookies_endpoint = path == "/api/youtube-cookies"
             cap = ((min(config.MAX_UPLOAD_MB, config.UPLOAD_PART_MB) if piece else config.MAX_UPLOAD_MB) + 8) * 1024 * 1024 \
-                if path == "/api/upload" or piece else 256 * 1024
+                if path == "/api/upload" or piece else (2 * 1024 * 1024 if cookies_endpoint else 256 * 1024)
             try:
                 if int(req.headers.get("content-length") or 0) > cap:
                     return await deny(413, f"That file is too big. The limit is {config.MAX_UPLOAD_MB} MB." if path == "/api/upload" else "That request is too large.")

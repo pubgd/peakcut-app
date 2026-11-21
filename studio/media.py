@@ -57,12 +57,20 @@ def oauth2_ready() -> bool:
             return True
     except Exception:
         pass
-    # yt-dlp stores the OAuth2 token in its cache dir; if it is there, the owner has approved.
-    for p in (Path("/root/.cache/yt-dlp/oauth2.txt"),
-              Path("/home/.cache/yt-dlp/oauth2.txt"),
-              config.DATA_DIR / "oauth2.txt",
-              config.DATA_DIR / "yt-dlp" / "oauth2.txt"):
+    # Restore token into yt-dlp cache from disk if available
+    for p in (config.DATA_DIR / "oauth2.txt",
+              config.DATA_DIR / "yt-dlp" / "oauth2.txt",
+              Path("/root/.cache/yt-dlp/oauth2.txt"),
+              Path.home() / ".cache" / "yt-dlp" / "oauth2.txt"):
         if p.is_file():
+            try:
+                import json, yt_dlp
+                data = json.loads(p.read_text(encoding="utf-8"))
+                if isinstance(data, dict) and "access_token" in data:
+                    yt_dlp.YoutubeDL({"quiet": True}).cache.store("youtube-oauth2", "token_data", data)
+                    return True
+            except Exception:
+                pass
             return True
     return False
 

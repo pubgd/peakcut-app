@@ -1488,76 +1488,117 @@ def debug_yt_clients(url: str = "https://youtu.be/7mjhCbFi9Wk"):
     return out
 
 
-_oauth_state = {"url": None, "running": False, "approved": False, "error": None}
+_OAUTH_CLIENT_ID = "861556708454-d6dlm3lh05idd8npek18k6be8ba3oc68.apps.googleusercontent.com"
+_OAUTH_CLIENT_SECRET = "SboVhoG9s0rNafixCSGGKXAT"
+_OAUTH_SCOPES = "https://gdata.youtube.com https://www.googleapis.com/auth/youtube"
+_oauth_state = {"url": None, "user_code": None, "running": False, "approved": False, "error": None}
 
 
 @app.get("/api/youtube/oauth/start")
 async def youtube_oauth_start(request: Request):
     """Begin YouTube OAuth2 device flow. Returns a Google device URL to open on your phone. Once approved,
-    yt-dlp stores a refresh token and YouTube downloads work from any IP address — no more "not a bot"
+    yt-dlp stores a refresh token and YouTube downloads work from any IP address — no more 'not a bot'
     blocks on Render."""
     global _oauth_state
     _admin(request)
-    if _oauth_state["running"]:
-        return {"ok": True, "url": _oauth_state["url"], "approved": _oauth_state["approved"],
-                "message": "Already running. Open the URL on your phone if you have not already."}
+    if _oauth_state["running"] and _oauth_state["url"]:
+        return {"ok": True, "url": _oauth_state["url"], "user_code": _oauth_state.get("user_code"),
+                "approved": _oauth_state["approved"],
+                "message": "Open the link on your phone/browser and approve."}
 
-    import subprocess
+    import json
     import threading
-    import re
+    import urllib.request
+    import uuid
 
-    def run_oauth():
+    try:
+        req = urllib.request.Request(
+            "https://www.youtube.com/o/oauth2/device/code",
+            data=json.dumps({
+                "client_id": _OAUTH_CLIENT_ID,
+                "scope": _OAUTH_SCOPES,
+                "device_id": uuid.uuid4().hex,
+                "device_model": "ytlr::"
+            }).encode(),
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            code_res = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        return {"ok": False, "error": f"Failed to get device code: {e}"}
+
+    v_url = code_res.get("verification_url", "https://www.google.com/device")
+    u_code = code_res.get("user_code", "")
+    full_url = f"{v_url}?user_code={u_code}" if u_code else v_url
+    d_code = code_res.get("device_code")
+    interval = int(code_res.get("interval") or 5)
+
+    _oauth_state["url"] = full_url
+    _oauth_state["user_code"] = u_code
+    _oauth_state["running"] = True
+    _oauth_state["approved"] = False
+    _oauth_state["error"] = None
+
+    def poll_token():
         global _oauth_state
-        _oauth_state["running"] = True
-        try:
-            import sys
-            import yt_dlp
-            proc = subprocess.Popen(
-                [sys.executable, "-m", "yt_dlp", "--username=oauth2",
-                 "--simulate", "https://www.youtube.com/watch?v=7mjhCbFi9Wk"],
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
-            )
-            url_seen = False
-            for line in iter(proc.stdout.readline, ""):
-                m = re.search(r"https://(?:www\.)?google\.com/device\S*", line)
-                code_m = re.search(r"enter code\s+([A-Za-z0-9-]+)", line, re.I)
-                if m and not url_seen:
-                    u = m.group(0).rstrip(".,;")
-                    if code_m and "?" not in u:
-                        u = f"{u}?user_code={code_m.group(1)}"
-                    _oauth_state["url"] = u
-                    url_seen = True
-            proc.wait(timeout=300)
-            if proc.returncode == 0:
-                _oauth_state["approved"] = True
-                media._yt_refused_until = 0.0
-            else:
-                _oauth_state["error"] = "Authorization timed out or was refused."
-        except Exception as e:
-            _oauth_state["error"] = str(e)
-        finally:
-            _oauth_state["running"] = False
+        start_t = time.time()
+        while time.time() - start_t < 1200:  # 20 minutes
+            time.sleep(interval)
+            try:
+                t_req = urllib.request.Request(
+                    "https://www.youtube.com/o/oauth2/token",
+                    data=json.dumps({
+                        "client_id": _OAUTH_CLIENT_ID,
+                        "client_secret": _OAUTH_CLIENT_SECRET,
+                        "device_code": d_code,
+                        "grant_type": "urn:ietf:params:oauth:grant-type:device_code"
+                    }).encode(),
+                    headers={"Content-Type": "application/json"}
+                )
+                with urllib.request.urlopen(t_req, timeout=15) as resp:
+                    tok = json.loads(resp.read().decode("utf-8"))
+                if "access_token" in tok:
+                    token_data = {
+                        "access_token": tok["access_token"],
+                        "expires": time.time() + tok.get("expires_in", 3600),
+                        "refresh_token": tok["refresh_token"],
+                        "token_type": tok.get("token_type", "Bearer")
+                    }
+                    try:
+                        import yt_dlp
+                        yt_dlp.YoutubeDL().cache.store("youtube-oauth2", "token_data", token_data)
+                    except Exception:
+                        pass
+                    # Persist across paths
+                    for p in (config.DATA_DIR / "oauth2.txt",
+                              config.DATA_DIR / "yt-dlp" / "oauth2.txt",
+                              Path("/root/.cache/yt-dlp/oauth2.txt"),
+                              Path.home() / ".cache" / "yt-dlp" / "oauth2.txt"):
+                        try:
+                            p.parent.mkdir(parents=True, exist_ok=True)
+                            p.write_text(json.dumps(token_data), encoding="utf-8")
+                        except OSError:
+                            pass
+                    _oauth_state["approved"] = True
+                    _oauth_state["running"] = False
+                    media._yt_refused_until = 0.0
+                    return
+            except Exception:
+                pass
+        _oauth_state["running"] = False
+        _oauth_state["error"] = "Timed out waiting for approval."
 
-    threading.Thread(target=run_oauth, daemon=True).start()
-
-    # Wait up to 12 seconds for yt-dlp to print the device URL.
-    import time as _time
-    for _ in range(24):
-        if _oauth_state["url"]:
-            break
-        _time.sleep(0.5)
-
-    if _oauth_state["url"]:
-        return {"ok": True, "url": _oauth_state["url"],
-                "message": "Open this URL on your phone, enter the code, and approve."}
-    return {"ok": False, "error": "yt-dlp did not return a device URL yet. Try again."}
+    threading.Thread(target=poll_token, daemon=True).start()
+    return {"ok": True, "url": full_url, "user_code": u_code,
+            "message": "Open this URL on your phone or PC, enter the code, and tap Allow."}
 
 
 @app.get("/api/youtube/oauth/status")
 async def youtube_oauth_status(request: Request):
     """Check whether the owner has approved the OAuth2 device flow yet."""
     _admin(request)
-    return {"ok": True, "url": _oauth_state.get("url"), "approved": _oauth_state.get("approved"),
+    return {"ok": True, "url": _oauth_state.get("url"), "user_code": _oauth_state.get("user_code"),
+            "approved": _oauth_state.get("approved") or media.oauth2_ready(),
             "running": _oauth_state.get("running"), "error": _oauth_state.get("error")}
 
 

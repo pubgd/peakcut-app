@@ -61,13 +61,26 @@ def _from_dashboard() -> dict:
 
 
 def current() -> dict:
-    """Provider, models, address and key: what the dashboard saved, or else what .env says."""
+    """Provider, models, address and key: what the dashboard saved, falling back to .env for anything missing.
+
+    When the dashboard saved a provider but left models/key/address empty (or the data folder was wiped on
+    restart and ai.json no longer exists), fall back to what .env says instead of using empty values."""
     d = _from_dashboard()
     p = str(d.get("provider") or config.AI_PROVIDER or "").strip().lower()
-    return {"provider": ALIASES.get(p, p),
-            "models": list(d["models"]) if d.get("provider") else list(config.AI_MODELS),
-            "base_url": (str(d.get("base_url") or "") if d.get("provider") else config.AI_BASE_URL).rstrip("/"),
-            "key": str(d["key"]) if d.get("provider") and "key" in d else config.ai_key()}
+    provider = ALIASES.get(p, p)
+    models = list(d["models"]) if d.get("provider") else list(config.AI_MODELS)
+    if not models:
+        models = list(config.AI_MODELS)
+    base_url = str(d.get("base_url") or "") if d.get("provider") else config.AI_BASE_URL
+    if not base_url:
+        base_url = config.AI_BASE_URL
+    key = str(d["key"]) if d.get("provider") and "key" in d else config.ai_key()
+    if not key:
+        key = config.ai_key()
+    return {"provider": provider,
+            "models": models,
+            "base_url": str(base_url).rstrip("/"),
+            "key": key}
 
 
 def provider() -> str:

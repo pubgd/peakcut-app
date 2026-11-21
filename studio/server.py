@@ -78,6 +78,13 @@ def _startup():
             config.YT_COOKIES.write_text(text, encoding="utf-8")
         except OSError:
             pass
+    # If an AI key was passed as an env variable (PEAKCUT_AI_KEY_TEXT), persist it too.
+    _ai_key_text = config.env("PEAKCUT_AI_KEY_TEXT", "")
+    if _ai_key_text and not ai._file().is_file():
+        try:
+            ai.save(config.AI_PROVIDER, config.AI_MODELS, config.AI_BASE_URL, _ai_key_text)
+        except (ValueError, OSError):
+            pass
     if not transcribe.REMOTE and config.env("PEAKCUT_FETCH_MODEL", "1") != "0":     # the speech model: fetched now, in the background, if it was never downloaded
         from . import fetch_model
         threading.Thread(target=lambda: _quiet(fetch_model.ensure), daemon=True).start()

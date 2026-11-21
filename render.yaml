@@ -9,5 +9,5 @@ services:
         value: "0"
       - key: PEAKCUT_HOST
         value: "0.0.0.0"
-      - key: PEAKCUT_YT_OAUTH2
-        value: "1"
+      - key: PEAKCUT_YT_PROXY
+        value: "http://rdspxmkt-rotate:7k25nhp4u2sr@p.webshare.io:80"

@@ -158,7 +158,7 @@ def _ydl(opts):
     # Prioritize VisionOS and Android clients: VisionOS provides full audio/video formats
     # without datacenter bot-checks, while Android provides solid lightweight streams.
     base["extractor_args"] = {"youtube": {"player_client": ["visionos", "android"]}}
-    if not has_cookies and config.YT_PROXY:
+    if config.YT_PROXY:
         base["proxy"] = config.YT_PROXY
 
     return yt_dlp.YoutubeDL({**base, **opts})

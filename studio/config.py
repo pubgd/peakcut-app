@@ -133,6 +133,11 @@ YT_OAUTH2 = env("PEAKCUT_YT_OAUTH2", "0") == "1"
 # A residential or mobile proxy URL (e.g. http://user:pass@host:port) makes yt-dlp fetch YouTube
 # through a home IP, which is never refused as a bot. Set PEAKCUT_YT_PROXY to enable it.
 YT_PROXY = env("PEAKCUT_YT_PROXY", "").strip()
+if not YT_PROXY:
+    _pf = DATA_DIR / "proxy.txt"
+    if _pf.is_file():
+        with contextlib.suppress(OSError):
+            YT_PROXY = _pf.read_text(encoding="utf-8").strip()
 # the compact model for processors; a machine with a graphics card sets PEAKCUT_ASR_MODEL to the full-precision one
 ASR_MODEL_NAME = env("PEAKCUT_ASR_MODEL", "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8")
 ASR_MODEL_DIR = MODELS_DIR / ASR_MODEL_NAME

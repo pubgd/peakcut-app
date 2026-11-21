@@ -147,7 +147,8 @@ def _ydl(opts):
     if config.YT_OAUTH2 and not has_cookies:
         base["username"] = "oauth"
         base["password"] = ""
-        base["extractor_args"] = {"youtube": {"player_client": ["android", "visionos"]}}
+        # OAuth2 clients need broad coverage; web adds m4a formats that android/visionos may lack on long streams.
+        base["extractor_args"] = {"youtube": {"player_client": ["web", "android", "visionos"]}}
         has_cookies = True
     elif has_cookies:
         # Cookies are present — use them with web and android player for best compatibility
@@ -161,11 +162,14 @@ def _ydl(opts):
 
 
 def _video_format(height):
+    # Long streams and OAuth2 downloads may not have avc1+m4a at every resolution,
+    # so fall back through any codec/audio combo and end with plain best.
     return f"bv*[height<={height}][vcodec^=avc1]+ba[ext=m4a]/bv*[height<={height}]+ba/b[height<={height}]/b/best"
 
 
 def _section_format(height):
     # Segmented formats (m3u8) let ffmpeg seek directly to time slices without downloading entire monolithic streams
+    # Long streams/OAuth2 may not expose m3u8+avc1+m4a, so fall back progressively to best.
     return (f"bv*[height<={height}][protocol^=m3u8]+ba[protocol^=m3u8]/"
             f"bv*[height<={height}][vcodec^=avc1]+ba[ext=m4a]/"
             f"bv*[height<={height}]+ba/b[height<={height}]/b/best")
@@ -332,7 +336,11 @@ def download(url: str, job_dir: Path, height=720) -> Path:
     """The whole video. Used for shorter videos, where this is quicker than fetching pieces."""
     with _youtube_guard(url), _ydl({"format": _video_format(height), "merge_output_format": "mp4",
                                     "outtmpl": str(job_dir / "source.%(ext)s")}) as ydl:
-        ydl.download([url])
+        try:
+            ydl.download([url])
+        except Exception as e:
+            from studio import safe
+            raise YouTubeBlocked(f"Couldn't download video - YouTube is refusing this server right now. Use a video file instead, or wait a few minutes. Error: {str(e)[:100]}") from None
     return _biggest(job_dir, "source")
 
 

@@ -155,18 +155,11 @@ def _ydl(opts):
             has_cookies = True
             break
 
-    # YouTube OAuth2 device flow: when approved, works reliably from cloud datacenters without bot checks
-    if config.YT_OAUTH2 and oauth2_ready():
-        base["username"] = "oauth2"
-        base["password"] = ""
-        base["extractor_args"] = {"youtube": {"player_client": ["android", "ios"]}}
-        has_cookies = True
-    elif has_cookies:
-        base["extractor_args"] = {"youtube": {"player_client": ["android", "ios"]}}
-    elif not has_cookies and config.YT_PROXY:
+    # Prioritize VisionOS and Android clients: VisionOS provides full audio/video formats
+    # without datacenter bot-checks, while Android provides solid lightweight streams.
+    base["extractor_args"] = {"youtube": {"player_client": ["visionos", "android"]}}
+    if not has_cookies and config.YT_PROXY:
         base["proxy"] = config.YT_PROXY
-    elif not has_cookies:
-        base["extractor_args"] = {"youtube": {"player_client": ["android", "ios"]}}
 
     return yt_dlp.YoutubeDL({**base, **opts})
 

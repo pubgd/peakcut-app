@@ -157,11 +157,12 @@ def _ydl(opts):
     # Cookies saved by an admin (Settings, Connected apps), plus the classic cookies.txt files.
     base.update(cookie_opts())
     has_cookies = bool(base.get("cookiefile"))
-    for cp in (Path("/app/cookies.txt"), Path("/etc/secrets/cookies.txt"), config.DATA_DIR / "cookies.txt", config.ROOT / "cookies.txt", Path("cookies.txt")):
-        if cp.is_file():
-            base["cookiefile"] = str(cp)
-            has_cookies = True
-            break
+    if not has_cookies:
+        for cp in (Path("/etc/secrets/cookies.txt"), config.DATA_DIR / "cookies.txt", config.ROOT / "cookies.txt", Path("/app/cookies.txt"), Path("cookies.txt")):
+            if cp.is_file() and cp.stat().st_size > 50:
+                base["cookiefile"] = str(cp)
+                has_cookies = True
+                break
 
     if oauth2_ready():
         base.setdefault("username", "oauth2")

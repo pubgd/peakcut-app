@@ -150,8 +150,8 @@ def _ydl(opts):
         base["extractor_args"] = {"youtube": {"player_client": ["android", "visionos"]}}
         has_cookies = True
     elif has_cookies:
-        # Cookies are present — use them with android player for best compatibility
-        base["extractor_args"] = {"youtube": {"player_client": ["android", "visionos"]}}
+        # Cookies are present — use them with web and android player for best compatibility
+        base["extractor_args"] = {"youtube": {"player_client": ["web", "android", "visionos"]}}
     elif not has_cookies and config.YT_PROXY:
         base["proxy"] = config.YT_PROXY
     elif not has_cookies:
@@ -161,14 +161,14 @@ def _ydl(opts):
 
 
 def _video_format(height):
-    return f"bv*[height<={height}][vcodec^=avc1]+ba[ext=m4a]/bv*[height<={height}]+ba/b[height<={height}]/b"
+    return f"bv*[height<={height}][vcodec^=avc1]+ba[ext=m4a]/bv*[height<={height}]+ba/b[height<={height}]/b/best"
 
 
 def _section_format(height):
     # Segmented formats (m3u8) let ffmpeg seek directly to time slices without downloading entire monolithic streams
     return (f"bv*[height<={height}][protocol^=m3u8]+ba[protocol^=m3u8]/"
             f"bv*[height<={height}][vcodec^=avc1]+ba[ext=m4a]/"
-            f"bv*[height<={height}]+ba/b[height<={height}]/b")
+            f"bv*[height<={height}]+ba/b[height<={height}]/b/best")
 
 
 def _biggest(job_dir: Path, stem: str) -> Path:
@@ -322,7 +322,7 @@ def download_audio(url: str, job_dir: Path, on_progress=None) -> Path:
         if on_progress and d.get("status") == "downloading" and total:
             on_progress(d.get("downloaded_bytes", 0) / total)
 
-    with _youtube_guard(url), _ydl({"format": "ba[ext=m4a]/ba/worst", "outtmpl": str(job_dir / "audio_src.%(ext)s"),
+    with _youtube_guard(url), _ydl({"format": "ba[ext=m4a]/ba/b/best", "outtmpl": str(job_dir / "audio_src.%(ext)s"),
                "progress_hooks": [hook]}) as ydl:
         ydl.download([url])
     return _biggest(job_dir, "audio_src")

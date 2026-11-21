@@ -51,6 +51,12 @@ def oauth2_ready() -> bool:
     """Has the owner approved the OAuth2 device flow yet? When yes, YouTube downloads work from any IP."""
     if not config.YT_OAUTH2:
         return False
+    try:
+        import yt_dlp
+        if yt_dlp.YoutubeDL({"quiet": True}).cache.load("youtube-oauth2", "token_data"):
+            return True
+    except Exception:
+        pass
     # yt-dlp stores the OAuth2 token in its cache dir; if it is there, the owner has approved.
     for p in (Path("/root/.cache/yt-dlp/oauth2.txt"),
               Path("/home/.cache/yt-dlp/oauth2.txt"),
@@ -141,18 +147,15 @@ def _ydl(opts):
             has_cookies = True
             break
 
-    # YouTube OAuth2 device flow: a one-time approve on the owner's phone gives a refresh token that
-    # works from any IP address, so cloud datacentre downloads are not refused as "not a bot".
-    # NOTE: When cookies are already present, prefer them over OAuth2 (cookies don't require device auth).
-    if config.YT_OAUTH2 and not has_cookies:
-        base["username"] = "oauth"
+    # YouTube OAuth2 device flow: only use if enabled AND approved by owner
+    if config.YT_OAUTH2 and oauth2_ready() and not has_cookies:
+        base["username"] = "oauth2"
         base["password"] = ""
-        # OAuth2 clients need broad coverage; web adds m4a formats that android/visionos may lack on long streams.
-        base["extractor_args"] = {"youtube": {"player_client": ["web", "android", "visionos"]}}
+        base["extractor_args"] = {"youtube": {"player_client": ["android", "visionos", "web"]}}
         has_cookies = True
     elif has_cookies:
-        # Cookies are present — use them with web and android player for best compatibility
-        base["extractor_args"] = {"youtube": {"player_client": ["web", "android", "visionos"]}}
+        # Cookies are present — use android and visionos first, with web as fallback
+        base["extractor_args"] = {"youtube": {"player_client": ["android", "visionos", "web"]}}
     elif not has_cookies and config.YT_PROXY:
         base["proxy"] = config.YT_PROXY
     elif not has_cookies:

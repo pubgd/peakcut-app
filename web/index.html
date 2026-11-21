@@ -2379,10 +2379,11 @@ async function ytCookiesCard(logo) {
   const act = `<button class="btn sm ${st.saved ? "ghost" : "primary"}" data-act="appsetup" data-p="ytdl">${ic("cog")}${st.saved ? "Replace" : "Add cookies"}</button>`
     + (st.saved ? `<button class="btn sm ghost" data-act="ytcookies" data-remove="1">Remove</button>` : "");
   const panel = open ? `<div class="appsetup">
-      <p class="sub">YouTube refuses many servers with "Sign in to confirm you're not a bot". Cookies from a signed-in YouTube account get past it. Use a spare Google account, not your main one.</p>
-      <ol><li>In a private browser window, sign in to YouTube with that account.</li>
-        <li>With an extension such as <b>Get cookies.txt LOCALLY</b>, export the cookies for youtube.com.</li>
-        <li>Paste the whole file below and save. Then close that private window without signing out.</li></ol>
+      <p class="sub">YouTube refuses cloud datacentres with "Sign in to confirm you're not a bot". Cookies from a signed-in YouTube account get past it.</p>
+      <ol><li>Open a browser where you are <b>signed in to youtube.com</b> (use a spare account).</li>
+        <li>Open <a href="https://www.youtube.com" target="_blank" style="color:var(--brand)">youtube.com</a> in that tab.</li>
+        <li>Click your <b>Get cookies.txt LOCALLY</b> extension, click <b>Export</b>.</li>
+        <li>Paste the exported text below and click Save.</li></ol>
       <label class="f">cookies.txt<textarea id="ytc" rows="6" spellcheck="false" autocomplete="off" placeholder="# Netscape HTTP Cookie File"></textarea></label>
       <div class="row"><button class="btn primary" data-act="ytcookies">Save</button><button class="btn ghost" data-act="appsetup" data-p="">Close</button></div></div>` : "";
   return `<section class="set-sec"><h2>YouTube links</h2><p class="help">Only needed when YouTube links (videos or lives) fail with "YouTube isn't letting PeakCut download".</p>

@@ -1450,8 +1450,8 @@ def debug_yt(url: str = "https://youtu.be/7mjhCbFi9Wk"):
     import yt_dlp
     try:
         opts = {}
-        if config.YT_OAUTH2:
-            opts = {"username": "oauth", "password": ""}
+        if config.YT_OAUTH2 and media.oauth2_ready():
+            opts = {"username": "oauth2", "password": ""}
         with media._ydl(opts) as ydl:
             i = ydl.extract_info(url, download=False, process=False)
             return {"title": i.get("title"), "cookiefile": ydl.params.get("cookiefile"), "formats": len(i.get("formats") or [])}
@@ -1504,8 +1504,8 @@ async def youtube_oauth_start(request: Request):
             import sys
             import yt_dlp
             proc = subprocess.Popen(
-                [sys.executable, "-m", "yt_dlp", "--username", "oauth", "--password", "", "--no-warnings",
-                 "--print", "aftervideo:__url__", "https://www.youtube.com/watch?v=7mjhCbFi9Wk"],
+                [sys.executable, "-m", "yt_dlp", "--username=oauth2", "--no-warnings",
+                 "--simulate", "https://www.youtube.com/watch?v=7mjhCbFi9Wk"],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
             )
             url_seen = False
@@ -1703,9 +1703,14 @@ def yt_cookies_put(request: Request, body: dict = Body(...)):
         f.unlink(missing_ok=True)
     else:
         rows = [l.split("\t") for l in text.splitlines() if l.strip() and not l.startswith("# ")]
-        if len(text) > 1_000_000 or not any(len(r) == 7 and "youtube.com" in r[0] for r in rows):
-            raise HTTPException(400, "That doesn't look like a cookies.txt file with YouTube cookies in it. Export it "
-                                     "from a browser signed in to YouTube, with an extension such as \"Get cookies.txt LOCALLY\".")
+        yt_rows = [r for r in rows if len(r) == 7 and ("youtube.com" in r[0] or "google.com" in r[0])]
+        if len(text) > 2_000_000 or not yt_rows:
+            raise HTTPException(400, "That file doesn't have youtube.com cookies. Open youtube.com in your browser "
+                                     "first, make sure you are signed in, and then export cookies.")
+        auth_keys = {"__Secure-1PSID", "LOGIN_INFO", "SID", "SAPISID", "HSID", "SSID", "APISID"}
+        if not any(r[5] in auth_keys for r in yt_rows if len(r) >= 6):
+            raise HTTPException(400, "Those cookies are from an unsigned-in session (missing LOGIN_INFO or SID). "
+                                     "Please sign in to YouTube in that browser before exporting cookies.")
         text = text if text.startswith("# Netscape") else "# Netscape HTTP Cookie File\n" + text
         f.write_text(text, encoding="utf-8")
         with contextlib.suppress(OSError):

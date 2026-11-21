@@ -2387,13 +2387,8 @@ async function ytCookiesCard(logo) {
         <li>Paste the exported text below and click Save.</li></ol>
       <label class="f">cookies.txt<textarea id="ytc" rows="6" spellcheck="false" autocomplete="off" placeholder="# Netscape HTTP Cookie File"></textarea></label>
       <div class="row"><button class="btn primary" data-act="ytcookies">Save</button><button class="btn ghost" data-act="appsetup" data-p="">Close</button></div></div>` : "";
-  const oauthCard = ost ? `<div class="appcard"><span class="applogo" style="background:#FF0000">${logo}</span>
-    <div class="apptx"><b>Google Sign-in (OAuth2 Device Code)</b><span>${ost.approved ? "Connected & Active. YouTube downloads authorized without bot blocks." : "Not connected. Authorize once from your phone or browser to permanently bypass bot checks."}</span></div>
-    <div class="appact"><button class="btn sm ${ost.approved ? "ghost" : "primary"}" data-act="ytoauth">${ost.approved ? "Re-authorize" : "Connect YouTube"}</button></div>
-    ${S.ytOauthUrl ? `<div class="appsetup" style="margin-top:10px;grid-column:1/-1"><p class="sub">Open this link to approve on your Google account:</p><p><a href="${S.ytOauthUrl}" target="_blank" class="btn primary" style="display:inline-block">${ic("link")}Open Google Device Authorization</a></p><p class="help">Code: <b>${esc(S.ytOauthCode || "")}</b> — Once approved, PeakCut will update automatically.</p></div>` : ""}
-  </div>` : "";
   return `<section class="set-sec"><h2>YouTube downloads</h2><p class="help">Required on cloud hosts like Render where YouTube shows "Sign in to confirm you're not a bot".</p>
-    <div class="apps">${oauthCard}<div class="appcard" style="margin-top:10px"><span class="applogo" style="background:#FF0000">${logo}</span>
+    <div class="apps"><div class="appcard"><span class="applogo" style="background:#FF0000">${logo}</span>
     <div class="apptx"><b>YouTube cookies</b><span>${st.saved ? `Saved ${new Date(st.updated * 1000).toLocaleString()}. Used for every YouTube link.` : "None saved."}</span></div>
     <div class="appact">${act}</div>${panel}</div></div></section>`;
 }

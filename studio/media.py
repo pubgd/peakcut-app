@@ -42,13 +42,13 @@ def youtube_paused() -> bool:
 
 
 def has_youtube_auth() -> bool:
-    """Has the user added cookies or approved OAuth2 device flow?"""
+    """Has the user added cookies?"""
     if config.YT_COOKIES.is_file() or (config.DATA_DIR / "cookies.txt").is_file():
         return True
     for cp in (Path("/app/cookies.txt"), Path("/etc/secrets/cookies.txt"), config.ROOT / "cookies.txt", Path("cookies.txt")):
         if cp.is_file():
             return True
-    return oauth2_ready()
+    return False
 
 
 def check_youtube(url: str):
@@ -58,28 +58,7 @@ def check_youtube(url: str):
 
 
 def oauth2_ready() -> bool:
-    """Has the owner approved the OAuth2 device flow yet? When yes, YouTube downloads work from any IP."""
-    try:
-        import yt_dlp
-        if yt_dlp.YoutubeDL({"quiet": True}).cache.load("youtube-oauth2", "token_data"):
-            return True
-    except Exception:
-        pass
-    # Restore token into yt-dlp cache from disk if available
-    for p in (config.DATA_DIR / "oauth2.txt",
-              config.DATA_DIR / "yt-dlp" / "oauth2.txt",
-              Path("/root/.cache/yt-dlp/oauth2.txt"),
-              Path.home() / ".cache" / "yt-dlp" / "oauth2.txt"):
-        if p.is_file():
-            try:
-                import json, yt_dlp
-                data = json.loads(p.read_text(encoding="utf-8"))
-                if isinstance(data, dict) and "access_token" in data:
-                    yt_dlp.YoutubeDL({"quiet": True}).cache.store("youtube-oauth2", "token_data", data)
-                    return True
-            except Exception:
-                pass
-            return True
+    """OAuth2 device flow has been permanently deprecated and disabled by YouTube/yt-dlp."""
     return False
 
 
@@ -164,17 +143,13 @@ def _ydl(opts):
                 has_cookies = True
                 break
 
-    if oauth2_ready():
-        base.setdefault("username", "oauth2")
-        base.setdefault("password", "")
-
     if has_cookies:
-        # Browser cookies exported from Chrome/Firefox are read by the web and mweb player clients.
+        # Browser cookies exported from Chrome/Firefox are read by web and mobile clients.
         # Direct connection with authenticated cookies avoids rotating proxy IP mismatch and bot-checks.
-        base["extractor_args"] = {"youtube": {"player_client": ["web", "mweb", "android"]}}
+        base["extractor_args"] = {"youtube": {"player_client": ["web", "mweb", "android", "ios"]}}
     else:
-        # Without cookies, prioritize VisionOS and Android clients to minimize bot-checks.
-        base["extractor_args"] = {"youtube": {"player_client": ["visionos", "android"]}}
+        # Without cookies, prioritize mobile clients to avoid bot-checks through rotating proxy.
+        base["extractor_args"] = {"youtube": {"player_client": ["ios", "android", "mweb", "web"]}}
         if config.YT_PROXY:
             base["proxy"] = config.YT_PROXY
 

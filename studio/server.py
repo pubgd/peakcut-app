@@ -65,6 +65,12 @@ def _startup():
             f.unlink()
         except OSError:
             pass
+    # Clean up obsolete oauth2 cache files if present
+    for op in (config.DATA_DIR / "oauth2.txt", config.DATA_DIR / "yt-dlp" / "oauth2.txt", Path("/root/.cache/yt-dlp/oauth2.txt"), Path.home() / ".cache" / "yt-dlp" / "oauth2.txt"):
+        try:
+            op.unlink(missing_ok=True)
+        except OSError:
+            pass
     render.install_fonts()
     if _tools.missing():
         print("\n  " + _tools.HELP + "\n", flush=True)
@@ -1459,8 +1465,6 @@ def debug_yt(url: str = "https://youtu.be/7mjhCbFi9Wk"):
     import yt_dlp
     try:
         opts = {}
-        if config.YT_OAUTH2 and media.oauth2_ready():
-            opts = {"username": "oauth2", "password": ""}
         with media._ydl(opts) as ydl:
             i = ydl.extract_info(url, download=False, process=False)
             return {"title": i.get("title"), "cookiefile": ydl.params.get("cookiefile"), "formats": len(i.get("formats") or [])}

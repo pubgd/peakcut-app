@@ -18,7 +18,7 @@ services:
       - key: PEAKCUT_FETCH_MODEL
         value: "0"
       - key: PEAKCUT_YT_OAUTH2
-        value: "1"
+        value: "0"
       - key: PEAKCUT_AI_KEY
         sync: false
       - key: PEAKCUT_YT_COOKIES_TEXT

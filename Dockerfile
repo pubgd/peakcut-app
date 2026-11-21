@@ -18,7 +18,7 @@ ENV PEAKCUT_DATA=/data \
     PEAKCUT_HOST=0.0.0.0 \
     PEAKCUT_PORT=8765 \
     PEAKCUT_TRUST_PROXY=1 \
-    PEAKCUT_YT_PROXY="http://rdspxmkt-rotate:7k25nhp4u2sr@p.webshare.io:80" \
+    PEAKCUT_YT_PROXY=http://rdspxmkt-rotate:7k25nhp4u2sr@p.webshare.io:80 \
     PYTHONUNBUFFERED=1
 VOLUME /data
 EXPOSE 8765

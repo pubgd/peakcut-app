@@ -1451,7 +1451,7 @@ def debug_cookies():
     found = {str(p): (p.is_file(), p.stat().st_size if p.is_file() else 0) for p in paths}
     node = shutil.which("node")
     deno = shutil.which("deno")
-    return {"found": found, "cwd": str(Path.cwd()), "node": str(node), "deno": str(deno), "files_in_cwd": [x.name for x in Path(".").iterdir()][:25]}
+    return {"found": found, "cwd": str(Path.cwd()), "node": str(node), "deno": str(deno), "proxy": config.YT_PROXY, "files_in_cwd": [x.name for x in Path(".").iterdir()][:25]}
 
 
 @app.get("/api/debug/yt")

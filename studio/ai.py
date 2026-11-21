@@ -68,13 +68,13 @@ def current() -> dict:
     d = _from_dashboard()
     p = str(d.get("provider") or config.AI_PROVIDER or "").strip().lower()
     provider = ALIASES.get(p, p)
-    models = list(d["models"]) if d.get("provider") else list(config.AI_MODELS)
+    models = [m for m in (d.get("models") or []) if m] if d.get("provider") else list(config.AI_MODELS)
     if not models:
         models = list(config.AI_MODELS)
-    base_url = str(d.get("base_url") or "") if d.get("provider") else config.AI_BASE_URL
+    base_url = str(d.get("base_url") or "").rstrip("/") if d.get("provider") and d.get("base_url") else config.AI_BASE_URL
     if not base_url:
         base_url = config.AI_BASE_URL
-    key = str(d["key"]) if d.get("provider") and "key" in d else config.ai_key()
+    key = str(d.get("key") or "").strip() if d.get("provider") and "key" in d else config.ai_key()
     if not key:
         key = config.ai_key()
     return {"provider": provider,

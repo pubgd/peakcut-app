@@ -19,6 +19,9 @@ ENV PEAKCUT_DATA=/data \
     PEAKCUT_PORT=8765 \
     PEAKCUT_TRUST_PROXY=1 \
     PEAKCUT_YT_PROXY=http://rdspxmkt-rotate:7k25nhp4u2sr@p.webshare.io:80 \
+    PEAKCUT_AI_PROVIDER=gemini \
+    PEAKCUT_AI_MODELS=gemini-3.1-flash-lite \
+    PEAKCUT_FETCH_MODEL=0 \
     PYTHONUNBUFFERED=1
 VOLUME /data
 EXPOSE 8765

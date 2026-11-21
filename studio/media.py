@@ -188,17 +188,41 @@ def _biggest(job_dir: Path, stem: str) -> Path:
 
 def info(url: str) -> dict:
     """Title, channel and length, without downloading anything."""
-    with _youtube_guard(url), _ydl({}) as ydl:
+    last_err = None
+    for attempt in range(3):
         try:
-            i = ydl.extract_info(url, download=False, process=False)
-        except Exception as e:
-            msg = str(e).lower()
-            if "this video is unavailable" in msg or "video unavailable" in msg or "private video" in msg:
-                raise ValueError("This video is unavailable or private on YouTube. Check the link.") from None
+            with _youtube_guard(url), _ydl({}) as ydl:
+                try:
+                    i = ydl.extract_info(url, download=False, process=False)
+                except Exception as e:
+                    msg = str(e).lower()
+                    if "this video is unavailable" in msg or "video unavailable" in msg or "private video" in msg:
+                        raise ValueError("This video is unavailable or private on YouTube. Check the link.") from None
+                    raise
+            return {"title": i.get("title") or "", "uploader": i.get("uploader") or i.get("channel") or "",
+                    "duration": float(i.get("duration") or 0), "is_live": bool(i.get("is_live")),
+                    "thumbnail": i.get("thumbnail") or "", "kind": i.get("_type") or "video"}
+        except YouTubeBlocked:
             raise
-    return {"title": i.get("title") or "", "uploader": i.get("uploader") or i.get("channel") or "",
-            "duration": float(i.get("duration") or 0), "is_live": bool(i.get("is_live")),
-            "thumbnail": i.get("thumbnail") or "", "kind": i.get("_type") or "video"}
+        except Exception as e:
+            last_err = e
+            if attempt < 2 and is_youtube(url):
+                time.sleep(1)
+                continue
+            raise
+    if last_err:
+        raise last_err
+
+
+def _fetch_caption_data(ydl, track_url: str) -> bytes:
+    """Fetch caption JSON data, trying direct request with browser user-agent first to avoid timedtext 429 errors."""
+    import urllib.request
+    try:
+        req = urllib.request.Request(track_url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return resp.read(40_000_000)
+    except Exception:
+        return ydl.urlopen(track_url).read(40_000_000)
 
 
 def youtube_words(url: str):
@@ -207,20 +231,35 @@ def youtube_words(url: str):
     if not is_youtube(url):
         return None
     import json
-    with _youtube_guard(url), _ydl({}) as ydl:
-        i = ydl.extract_info(url, download=False, process=False)
-        auto = i.get("automatic_captions") or {}
-        lang = str(i.get("language") or "").strip().lower()
-        base = lang.split("-")[0] if lang else ""
-        candidates = [f"{lang}-orig", lang, f"{base}-orig", base]
-        key = next((c for c in candidates if c and c in auto), None)
-        if not key:
-            key = next((k for k in auto if k.endswith("-orig")), None)
-        track = next((f for f in auto.get(key) or [] if f.get("ext") == "json3" and f.get("url")), None) if key else None
-        if not track:
+    for attempt in range(3):
+        try:
+            with _youtube_guard(url), _ydl({}) as ydl:
+                i = ydl.extract_info(url, download=False, process=False)
+                subs = i.get("subtitles") or {}
+                auto = i.get("automatic_captions") or {}
+                lang = str(i.get("language") or "").strip().lower()
+                base = lang.split("-")[0] if lang else ""
+                candidates = [f"{lang}-orig", lang, f"{base}-orig", base, "en-orig", "en"]
+                key, track = None, None
+                for pool in (subs, auto):
+                    key = next((c for c in candidates if c and c in pool), None)
+                    if not key:
+                        key = next((k for k in pool if k.endswith("-orig")), None)
+                    track = next((f for f in pool.get(key) or [] if f.get("ext") == "json3" and f.get("url")), None) if key else None
+                    if track:
+                        break
+                if not track or not key:
+                    return None
+                raw = _fetch_caption_data(ydl, track["url"])
+            return _caption_words(json.loads(raw)), key.replace("-orig", "")
+        except YouTubeBlocked:
+            raise
+        except Exception:
+            if attempt < 2:
+                time.sleep(1)
+                continue
             return None
-        raw = ydl.urlopen(track["url"]).read(40_000_000)
-    return _caption_words(json.loads(raw)), key.replace("-orig", "")
+    return None
 
 
 def youtube_english_words(url: str):
@@ -229,18 +268,28 @@ def youtube_english_words(url: str):
     if not is_youtube(url):
         return None
     import json
-    with _youtube_guard(url), _ydl({}) as ydl:
-        i = ydl.extract_info(url, download=False, process=False)
-        tracks = []
-        for group in (i.get("subtitles") or {}, i.get("automatic_captions") or {}):
-            for k in ("en", "en-US", "en-GB"):
-                tracks.append(next((f for f in group.get(k) or [] if f.get("ext") == "json3" and f.get("url")), None))
-        track = next((t for t in tracks if t), None)
-        if not track:
+    for attempt in range(3):
+        try:
+            with _youtube_guard(url), _ydl({}) as ydl:
+                i = ydl.extract_info(url, download=False, process=False)
+                tracks = []
+                for group in (i.get("subtitles") or {}, i.get("automatic_captions") or {}):
+                    for k in ("en", "en-US", "en-GB"):
+                        tracks.append(next((f for f in group.get(k) or [] if f.get("ext") == "json3" and f.get("url")), None))
+                track = next((t for t in tracks if t), None)
+                if not track:
+                    return None
+                raw = _fetch_caption_data(ydl, track["url"])
+            words = _caption_words(json.loads(raw))
+            return words or None
+        except YouTubeBlocked:
+            raise
+        except Exception:
+            if attempt < 2:
+                time.sleep(1)
+                continue
             return None
-        raw = ydl.urlopen(track["url"]).read(40_000_000)
-    words = _caption_words(json.loads(raw))
-    return words or None
+    return None
 
 
 def _caption_words(data: dict) -> list:
@@ -329,21 +378,46 @@ def download_audio(url: str, job_dir: Path, on_progress=None) -> Path:
         if on_progress and d.get("status") == "downloading" and total:
             on_progress(d.get("downloaded_bytes", 0) / total)
 
-    with _youtube_guard(url), _ydl({"format": "ba[ext=m4a]/ba/b/best", "outtmpl": str(job_dir / "audio_src.%(ext)s"),
-               "progress_hooks": [hook]}) as ydl:
-        ydl.download([url])
+    last_err = None
+    for attempt in range(3):
+        try:
+            with _youtube_guard(url), _ydl({"format": "ba[ext=m4a]/ba/b/best", "outtmpl": str(job_dir / "audio_src.%(ext)s"),
+                       "progress_hooks": [hook]}) as ydl:
+                ydl.download([url])
+            return _biggest(job_dir, "audio_src")
+        except YouTubeBlocked:
+            raise
+        except Exception as e:
+            last_err = e
+            if attempt < 2 and is_youtube(url):
+                time.sleep(1)
+                continue
+            raise
+    if last_err:
+        raise last_err
     return _biggest(job_dir, "audio_src")
 
 
 def download(url: str, job_dir: Path, height=720) -> Path:
     """The whole video. Used for shorter videos, where this is quicker than fetching pieces."""
-    with _youtube_guard(url), _ydl({"format": _video_format(height), "merge_output_format": "mp4",
-                                    "outtmpl": str(job_dir / "source.%(ext)s")}) as ydl:
+    last_err = None
+    for attempt in range(3):
         try:
-            ydl.download([url])
+            with _youtube_guard(url), _ydl({"format": _video_format(height), "merge_output_format": "mp4",
+                                            "outtmpl": str(job_dir / "source.%(ext)s")}) as ydl:
+                ydl.download([url])
+            return _biggest(job_dir, "source")
+        except YouTubeBlocked:
+            raise
         except Exception as e:
+            last_err = e
+            if attempt < 2 and is_youtube(url):
+                time.sleep(1)
+                continue
             from studio import safe
             raise YouTubeBlocked(f"Couldn't download video - YouTube is refusing this server right now. Use a video file instead, or wait a few minutes. Error: {str(e)[:100]}") from None
+    if last_err:
+        raise last_err
     return _biggest(job_dir, "source")
 
 
@@ -356,8 +430,22 @@ def download_section(url: str, out_dir: Path, stem: str, start: float, end: floa
             "download_ranges": download_range_func(None, [(max(0.0, start), end)])}
     if exact:
         opts["force_keyframes_at_cuts"] = True
-    with _youtube_guard(url), _ydl(opts) as ydl:
-        ydl.download([url])
+    last_err = None
+    for attempt in range(3):
+        try:
+            with _youtube_guard(url), _ydl(opts) as ydl:
+                ydl.download([url])
+            return _biggest(out_dir, stem)
+        except YouTubeBlocked:
+            raise
+        except Exception as e:
+            last_err = e
+            if attempt < 2 and is_youtube(url):
+                time.sleep(1)
+                continue
+            raise
+    if last_err:
+        raise last_err
     return _biggest(out_dir, stem)
 
 

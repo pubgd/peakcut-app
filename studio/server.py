@@ -87,11 +87,11 @@ def _startup():
                     break
                 except OSError:
                     pass
-    # If an AI key was passed as an env variable (PEAKCUT_AI_KEY_TEXT), persist it too.
-    _ai_key_text = config.env("PEAKCUT_AI_KEY_TEXT", "")
+    # If an AI key was passed as an env variable, persist it too so ai.json exists immediately.
+    _ai_key_text = config.env("PEAKCUT_AI_KEY_TEXT", "") or config.ai_key()
     if _ai_key_text and not ai._file().is_file():
         try:
-            ai.save(config.AI_PROVIDER, config.AI_MODELS, config.AI_BASE_URL, _ai_key_text)
+            ai.save(config.AI_PROVIDER or "gemini", config.AI_MODELS or ["gemini-3.1-flash-lite"], config.AI_BASE_URL, _ai_key_text)
         except (ValueError, OSError):
             pass
     if not transcribe.REMOTE and config.env("PEAKCUT_FETCH_MODEL", "1") != "0":     # the speech model: fetched now, in the background, if it was never downloaded

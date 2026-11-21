@@ -595,11 +595,6 @@ def _run_job(job):
         _set(job, status="running", stage="Picking up where it stopped", error=None)
     else:
         _set(job, status="running", stage="Getting the audio", progress=0.03, error=None, clips=[], ai={}, done_blocks=0)
-    if not transcribe.model_ready() and not transcribe.REMOTE:
-        from . import fetch_model
-        _set(job, stage="Getting the speech model (one time, about 480 MB)")
-        fetch_model.ensure()
-        _set(job, stage="Getting the audio")
     fetch = ThreadPoolExecutor(1)
     video = None
     if src["type"] == "url":
@@ -677,7 +672,7 @@ def _run_job(job):
         began[clip["id"]] = time.time()
         if src["type"] == "url" and (pieces or not whole_video()):
             _fetch_piece(job, clip, audio)
-        if clip["status"] != "error" and clip.get("captions", True) and yt and yt[1].lower().startswith("en"):
+        if clip["status"] != "error" and clip.get("captions", True) and yt and yt[1].lower().startswith("en") and (transcribe.model_ready() or transcribe.REMOTE):
             # The clip was found with YouTube's transcript. What is shown on screen comes from our own model,
             # run on just this clip: full punctuation, nothing blanked out, timings to the word.
             a0, b0 = max(lo, int((clip["start"] - 1.5) * 16000)), min(hi, int((clip["end"] + 1.5) * 16000))
@@ -751,6 +746,10 @@ def _run_job(job):
             _set(job, stage="Reading the transcript" + where)
             bw = [dict(w, s=round(w["s"] - shift, 2), e=round(w["e"] - shift, 2)) for w in yt[0] if a / 16000 <= w["s"] < b / 16000]
         else:
+            if not transcribe.model_ready() and not transcribe.REMOTE:
+                from . import fetch_model
+                _set(job, stage="Getting the speech model (one time, about 480 MB)")
+                fetch_model.ensure()
             _set(job, stage="Writing the transcript" + where)
             now_on[0] = bi
             hear(bi)

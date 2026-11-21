@@ -41,16 +41,24 @@ def youtube_paused() -> bool:
     return time.time() < _yt_refused_until
 
 
+def has_youtube_auth() -> bool:
+    """Has the user added cookies or approved OAuth2 device flow?"""
+    if config.YT_COOKIES.is_file() or (config.DATA_DIR / "cookies.txt").is_file():
+        return True
+    for cp in (Path("/app/cookies.txt"), Path("/etc/secrets/cookies.txt"), config.ROOT / "cookies.txt", Path("cookies.txt")):
+        if cp.is_file():
+            return True
+    return oauth2_ready()
+
+
 def check_youtube(url: str):
     """Raise YouTubeBlocked straight away if YouTube is refusing this server right now."""
-    if is_youtube(url) and youtube_paused() and not oauth2_ready():
+    if is_youtube(url) and youtube_paused() and not has_youtube_auth():
         raise YouTubeBlocked(YT_BLOCKED)
 
 
 def oauth2_ready() -> bool:
     """Has the owner approved the OAuth2 device flow yet? When yes, YouTube downloads work from any IP."""
-    if not config.YT_OAUTH2:
-        return False
     try:
         import yt_dlp
         if yt_dlp.YoutubeDL({"quiet": True}).cache.load("youtube-oauth2", "token_data"):
@@ -155,11 +163,19 @@ def _ydl(opts):
             has_cookies = True
             break
 
-    # Prioritize VisionOS and Android clients: VisionOS provides full audio/video formats
-    # without datacenter bot-checks, while Android provides solid lightweight streams.
-    base["extractor_args"] = {"youtube": {"player_client": ["visionos", "android"]}}
-    if config.YT_PROXY:
-        base["proxy"] = config.YT_PROXY
+    if oauth2_ready():
+        base.setdefault("username", "oauth2")
+        base.setdefault("password", "")
+
+    if has_cookies:
+        # Browser cookies exported from Chrome/Firefox are read by the web and mweb player clients.
+        # Direct connection with authenticated cookies avoids rotating proxy IP mismatch and bot-checks.
+        base["extractor_args"] = {"youtube": {"player_client": ["web", "mweb", "android"]}}
+    else:
+        # Without cookies, prioritize VisionOS and Android clients to minimize bot-checks.
+        base["extractor_args"] = {"youtube": {"player_client": ["visionos", "android"]}}
+        if config.YT_PROXY:
+            base["proxy"] = config.YT_PROXY
 
     return yt_dlp.YoutubeDL({**base, **opts})
 
@@ -188,10 +204,11 @@ def _biggest(job_dir: Path, stem: str) -> Path:
 
 def info(url: str) -> dict:
     """Title, channel and length, without downloading anything."""
+    check_youtube(url)
     last_err = None
     for attempt in range(3):
         try:
-            with _youtube_guard(url), _ydl({}) as ydl:
+            with _ydl({}) as ydl:
                 try:
                     i = ydl.extract_info(url, download=False, process=False)
                 except Exception as e:
@@ -202,13 +219,13 @@ def info(url: str) -> dict:
             return {"title": i.get("title") or "", "uploader": i.get("uploader") or i.get("channel") or "",
                     "duration": float(i.get("duration") or 0), "is_live": bool(i.get("is_live")),
                     "thumbnail": i.get("thumbnail") or "", "kind": i.get("_type") or "video"}
-        except YouTubeBlocked:
-            raise
         except Exception as e:
             last_err = e
             if attempt < 2 and is_youtube(url):
                 time.sleep(1)
                 continue
+            if note_refusal(url, e):
+                raise YouTubeBlocked(YT_BLOCKED) from None
             raise
     if last_err:
         raise last_err
@@ -230,10 +247,11 @@ def youtube_words(url: str):
     has none. Only the transcript in the language that was spoken is used, never a translation."""
     if not is_youtube(url):
         return None
+    check_youtube(url)
     import json
     for attempt in range(3):
         try:
-            with _youtube_guard(url), _ydl({}) as ydl:
+            with _ydl({}) as ydl:
                 i = ydl.extract_info(url, download=False, process=False)
                 subs = i.get("subtitles") or {}
                 auto = i.get("automatic_captions") or {}
@@ -252,12 +270,11 @@ def youtube_words(url: str):
                     return None
                 raw = _fetch_caption_data(ydl, track["url"])
             return _caption_words(json.loads(raw)), key.replace("-orig", "")
-        except YouTubeBlocked:
-            raise
-        except Exception:
+        except Exception as e:
             if attempt < 2:
                 time.sleep(1)
                 continue
+            note_refusal(url, e)
             return None
     return None
 
@@ -267,10 +284,11 @@ def youtube_english_words(url: str):
     otherwise YouTube's own translation of its transcript. Word list like youtube_words, or None."""
     if not is_youtube(url):
         return None
+    check_youtube(url)
     import json
     for attempt in range(3):
         try:
-            with _youtube_guard(url), _ydl({}) as ydl:
+            with _ydl({}) as ydl:
                 i = ydl.extract_info(url, download=False, process=False)
                 tracks = []
                 for group in (i.get("subtitles") or {}, i.get("automatic_captions") or {}):
@@ -282,12 +300,11 @@ def youtube_english_words(url: str):
                 raw = _fetch_caption_data(ydl, track["url"])
             words = _caption_words(json.loads(raw))
             return words or None
-        except YouTubeBlocked:
-            raise
-        except Exception:
+        except Exception as e:
             if attempt < 2:
                 time.sleep(1)
                 continue
+            note_refusal(url, e)
             return None
     return None
 
@@ -378,20 +395,21 @@ def download_audio(url: str, job_dir: Path, on_progress=None) -> Path:
         if on_progress and d.get("status") == "downloading" and total:
             on_progress(d.get("downloaded_bytes", 0) / total)
 
+    check_youtube(url)
     last_err = None
     for attempt in range(3):
         try:
-            with _youtube_guard(url), _ydl({"format": "ba[ext=m4a]/ba/b/best", "outtmpl": str(job_dir / "audio_src.%(ext)s"),
+            with _ydl({"format": "ba[ext=m4a]/ba/b/best", "outtmpl": str(job_dir / "audio_src.%(ext)s"),
                        "progress_hooks": [hook]}) as ydl:
                 ydl.download([url])
             return _biggest(job_dir, "audio_src")
-        except YouTubeBlocked:
-            raise
         except Exception as e:
             last_err = e
             if attempt < 2 and is_youtube(url):
                 time.sleep(1)
                 continue
+            if note_refusal(url, e):
+                raise YouTubeBlocked(YT_BLOCKED) from None
             raise
     if last_err:
         raise last_err
@@ -400,20 +418,21 @@ def download_audio(url: str, job_dir: Path, on_progress=None) -> Path:
 
 def download(url: str, job_dir: Path, height=720) -> Path:
     """The whole video. Used for shorter videos, where this is quicker than fetching pieces."""
+    check_youtube(url)
     last_err = None
     for attempt in range(3):
         try:
-            with _youtube_guard(url), _ydl({"format": _video_format(height), "merge_output_format": "mp4",
-                                            "outtmpl": str(job_dir / "source.%(ext)s")}) as ydl:
+            with _ydl({"format": _video_format(height), "merge_output_format": "mp4",
+                       "outtmpl": str(job_dir / "source.%(ext)s")}) as ydl:
                 ydl.download([url])
             return _biggest(job_dir, "source")
-        except YouTubeBlocked:
-            raise
         except Exception as e:
             last_err = e
             if attempt < 2 and is_youtube(url):
                 time.sleep(1)
                 continue
+            if note_refusal(url, e):
+                raise YouTubeBlocked(YT_BLOCKED) from None
             from studio import safe
             raise YouTubeBlocked(f"Couldn't download video - YouTube is refusing this server right now. Use a video file instead, or wait a few minutes. Error: {str(e)[:100]}") from None
     if last_err:
@@ -425,6 +444,7 @@ def download_section(url: str, out_dir: Path, stem: str, start: float, end: floa
     """Just one stretch of the video. The cut lands on a keyframe, so find_offset() pins the true start; with
     exact=True the cut is made at exactly `start` instead (slower), for when there is nothing to match against."""
     from yt_dlp.utils import download_range_func
+    check_youtube(url)
     out_dir.mkdir(parents=True, exist_ok=True)
     opts = {"format": _section_format(height), "merge_output_format": "mp4", "outtmpl": str(out_dir / (stem + ".%(ext)s")),
             "download_ranges": download_range_func(None, [(max(0.0, start), end)])}
@@ -433,16 +453,16 @@ def download_section(url: str, out_dir: Path, stem: str, start: float, end: floa
     last_err = None
     for attempt in range(3):
         try:
-            with _youtube_guard(url), _ydl(opts) as ydl:
+            with _ydl(opts) as ydl:
                 ydl.download([url])
             return _biggest(out_dir, stem)
-        except YouTubeBlocked:
-            raise
         except Exception as e:
             last_err = e
             if attempt < 2 and is_youtube(url):
                 time.sleep(1)
                 continue
+            if note_refusal(url, e):
+                raise YouTubeBlocked(YT_BLOCKED) from None
             raise
     if last_err:
         raise last_err

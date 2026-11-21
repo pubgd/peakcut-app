@@ -143,15 +143,10 @@ def _ydl(opts):
                 has_cookies = True
                 break
 
-    if has_cookies:
-        # Browser cookies exported from Chrome/Firefox are read by web and mobile clients.
-        # Direct connection with authenticated cookies avoids rotating proxy IP mismatch and bot-checks.
-        base["extractor_args"] = {"youtube": {"player_client": ["web", "mweb", "android", "ios"]}}
-    else:
-        # Without cookies, prioritize mobile clients to avoid bot-checks through rotating proxy.
-        base["extractor_args"] = {"youtube": {"player_client": ["ios", "android", "mweb", "web"]}}
-        if config.YT_PROXY:
-            base["proxy"] = config.YT_PROXY
+    # Prioritize android client which provides real audio and video streams without SABR / PO-token errors.
+    base["extractor_args"] = {"youtube": {"player_client": ["android", "web"]}}
+    if not has_cookies and config.YT_PROXY:
+        base["proxy"] = config.YT_PROXY
 
     return yt_dlp.YoutubeDL({**base, **opts})
 

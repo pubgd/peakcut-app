@@ -2568,21 +2568,33 @@ document.addEventListener("click", async e => {
       return;
     }
     if (a === "pasteurl") {
+      // Try modern clipboard API first
+      let pasted = false;
       try {
         if (navigator.clipboard && navigator.clipboard.readText) {
           const text = await navigator.clipboard.readText();
-          if (text) {
+          if (text && text.trim()) {
             const u = $("#url");
-            if (u) {
-              u.value = text.trim();
-              u.dispatchEvent(new Event("input", {bubbles: true}));
-              toast("Link pasted!", "ok");
-              return;
-            }
+            if (u) { u.value = text.trim(); u.dispatchEvent(new Event("input", {bubbles: true})); toast("Link paste ho gaya! ✓", "ok"); pasted = true; }
           }
         }
-      } catch {}
-      $("#url")?.focus();
+      } catch (_) { /* permission denied on mobile – fall through */ }
+      if (!pasted) {
+        // Mobile fallback: open a small dialog so the user can paste manually
+        const u = $("#url");
+        if (u) {
+          u.focus();
+          // Show a prompt-style overlay so Android long-press paste works
+          const val = window.prompt("YouTube / Twitch / Kick link yahan paste karein:");
+          if (val && val.trim()) {
+            u.value = val.trim();
+            u.dispatchEvent(new Event("input", {bubbles: true}));
+            toast("Link ready hai! ✓ Ab Make clips dabao.", "ok");
+          } else {
+            toast("Input box mein tap karein aur link paste karein.", "");
+          }
+        }
+      }
       return;
     }
     if (a === "menu") return $("#app").classList.toggle("open");

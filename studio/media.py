@@ -147,8 +147,8 @@ def _ydl(opts):
             has_cookies = True
             break
 
-    # YouTube OAuth2 device flow: only use if enabled AND approved by owner
-    if config.YT_OAUTH2 and oauth2_ready() and not has_cookies:
+    # YouTube OAuth2 device flow: when approved, works reliably from cloud datacenters without bot checks
+    if config.YT_OAUTH2 and oauth2_ready():
         base["username"] = "oauth2"
         base["password"] = ""
         base["extractor_args"] = {"youtube": {"player_client": ["android", "ios"]}}

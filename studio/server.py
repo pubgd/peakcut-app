@@ -1513,21 +1513,26 @@ async def youtube_oauth_start(request: Request):
             import sys
             import yt_dlp
             proc = subprocess.Popen(
-                [sys.executable, "-m", "yt_dlp", "--username=oauth2", "--no-warnings",
+                [sys.executable, "-m", "yt_dlp", "--username=oauth2",
                  "--simulate", "https://www.youtube.com/watch?v=7mjhCbFi9Wk"],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
             )
             url_seen = False
-            for line in iter(proc.stderr.readline, ""):
-                m = re.search(r"https://www\.google\.com/device\?[^\s\"']+", line)
+            for line in iter(proc.stdout.readline, ""):
+                m = re.search(r"https://(?:www\.)?google\.com/device\S*", line)
+                code_m = re.search(r"enter code\s+([A-Za-z0-9-]+)", line, re.I)
                 if m and not url_seen:
-                    _oauth_state["url"] = m.group(0)
+                    u = m.group(0).rstrip(".,;")
+                    if code_m and "?" not in u:
+                        u = f"{u}?user_code={code_m.group(1)}"
+                    _oauth_state["url"] = u
                     url_seen = True
-            proc.wait(timeout=180)
+            proc.wait(timeout=300)
             if proc.returncode == 0:
                 _oauth_state["approved"] = True
+                media._yt_refused_until = 0.0
             else:
-                _oauth_state["error"] = (proc.stderr.read() or "unknown error")[-300:]
+                _oauth_state["error"] = "Authorization timed out or was refused."
         except Exception as e:
             _oauth_state["error"] = str(e)
         finally:

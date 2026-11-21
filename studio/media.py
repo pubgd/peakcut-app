@@ -143,12 +143,15 @@ def _ydl(opts):
 
     # YouTube OAuth2 device flow: a one-time approve on the owner's phone gives a refresh token that
     # works from any IP address, so cloud datacentre downloads are not refused as "not a bot".
-    if config.YT_OAUTH2:
+    # NOTE: When cookies are already present, prefer them over OAuth2 (cookies don't require device auth).
+    if config.YT_OAUTH2 and not has_cookies:
         base["username"] = "oauth"
         base["password"] = ""
         base["extractor_args"] = {"youtube": {"player_client": ["android", "visionos"]}}
-        base.pop("cookiefile", None)
         has_cookies = True
+    elif has_cookies:
+        # Cookies are present — use them with android player for best compatibility
+        base["extractor_args"] = {"youtube": {"player_client": ["android", "visionos"]}}
     elif not has_cookies and config.YT_PROXY:
         base["proxy"] = config.YT_PROXY
     elif not has_cookies:

@@ -78,6 +78,15 @@ def _startup():
             config.YT_COOKIES.write_text(text, encoding="utf-8")
         except OSError:
             pass
+    if not config.YT_COOKIES.is_file():
+        for cp in (Path("/app/cookies.txt"), config.ROOT / "cookies.txt", Path("cookies.txt")):
+            if cp.is_file():
+                try:
+                    config.YT_COOKIES.parent.mkdir(parents=True, exist_ok=True)
+                    config.YT_COOKIES.write_text(cp.read_text(encoding="utf-8"), encoding="utf-8")
+                    break
+                except OSError:
+                    pass
     # If an AI key was passed as an env variable (PEAKCUT_AI_KEY_TEXT), persist it too.
     _ai_key_text = config.env("PEAKCUT_AI_KEY_TEXT", "")
     if _ai_key_text and not ai._file().is_file():
@@ -1707,7 +1716,7 @@ def yt_cookies_put(request: Request, body: dict = Body(...)):
         if len(text) > 2_000_000 or not yt_rows:
             raise HTTPException(400, "That file doesn't have youtube.com cookies. Open youtube.com in your browser "
                                      "first, make sure you are signed in, and then export cookies.")
-        auth_keys = {"__Secure-1PSID", "LOGIN_INFO", "SID", "SAPISID", "HSID", "SSID", "APISID"}
+        auth_keys = {"__Secure-1PSID", "__Secure-3PSID", "__Secure-3PAPISID", "LOGIN_INFO", "SID", "SAPISID", "HSID", "SSID", "APISID"}
         if not any(r[5] in auth_keys for r in yt_rows if len(r) >= 6):
             raise HTTPException(400, "Those cookies are from an unsigned-in session (missing LOGIN_INFO or SID). "
                                      "Please sign in to YouTube in that browser before exporting cookies.")

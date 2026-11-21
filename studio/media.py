@@ -154,12 +154,12 @@ def _ydl(opts):
         base["extractor_args"] = {"youtube": {"player_client": ["android", "visionos", "web", "mweb", "ios"]}}
         has_cookies = True
     elif has_cookies:
-        # Cookies are present — use android and visionos first, with web as fallback
-        base["extractor_args"] = {"youtube": {"player_client": ["android", "visionos", "web", "mweb", "ios"]}}
+        # Cookies are present — use web and mweb first (which utilize cookies), then android/visionos fallback
+        base["extractor_args"] = {"youtube": {"player_client": ["web", "mweb", "android", "visionos", "ios"]}}
     elif not has_cookies and config.YT_PROXY:
         base["proxy"] = config.YT_PROXY
     elif not has_cookies:
-        base["extractor_args"] = {"youtube": {"player_client": ["android", "visionos", "web", "mweb", "ios"]}}
+        base["extractor_args"] = {"youtube": {"player_client": ["web", "mweb", "android", "visionos", "ios"]}}
 
     return yt_dlp.YoutubeDL({**base, **opts})
 

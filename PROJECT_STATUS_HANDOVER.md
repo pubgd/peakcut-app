@@ -135,8 +135,11 @@ curl.exe -s "https://peakcut-app.onrender.com/api/preview?url=https%3A%2F%2Fwww.
 ## 7. Immediate Next Steps for Claude AI
 
 1. **Verify Render Cloud Deployment:**
-   - Ensure Render completes building commit `b342c3c`.
-   - Verify that long streams (like `XPfst4ws5Oc`) can be processed on `https://peakcut-app.onrender.com` without `Requested format is not available`.
+   - Ensure Render completes building commit `157a248` (Fix: YouTube OAuth2 username typo and headless checks; prioritize android/visionos player clients).
+   - Removed typo `username="oauth"` (plugin requires `username="oauth2"`).
+   - Ensured headless background daemon does not attempt unapproved OAuth2 device flows.
+   - Set `PEAKCUT_YT_OAUTH2=0` in Dockerfile and `render.yaml`.
+   - Client prioritization: `["android", "visionos", "web"]` prevents datacenter IP bot challenges.
 2. **APK Generation for User (If Requested):**
    - If the user prefers a standalone `.apk` install file over the PWA (Chrome "Add to Home Screen"), compile the Gradle project in `android/` using `gradlew assembleRelease` or guide the user to generate an APK via PWABuilder / WebIntoApp with the URL `https://peakcut-app.onrender.com`.
 3. **Keep User Informed in Simple Hinglish:**

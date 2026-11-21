@@ -141,7 +141,7 @@ def _ydl(opts):
     # Cookies saved by an admin (Settings, Connected apps), plus the classic cookies.txt files.
     base.update(cookie_opts())
     has_cookies = bool(base.get("cookiefile"))
-    for cp in (Path("/etc/secrets/cookies.txt"), config.DATA_DIR / "cookies.txt", config.ROOT / "cookies.txt", Path("cookies.txt")):
+    for cp in (Path("/app/cookies.txt"), Path("/etc/secrets/cookies.txt"), config.DATA_DIR / "cookies.txt", config.ROOT / "cookies.txt", Path("cookies.txt")):
         if cp.is_file():
             base["cookiefile"] = str(cp)
             has_cookies = True
@@ -151,15 +151,15 @@ def _ydl(opts):
     if config.YT_OAUTH2 and oauth2_ready() and not has_cookies:
         base["username"] = "oauth2"
         base["password"] = ""
-        base["extractor_args"] = {"youtube": {"player_client": ["android", "visionos", "web"]}}
+        base["extractor_args"] = {"youtube": {"player_client": ["android", "visionos", "web", "mweb", "ios"]}}
         has_cookies = True
     elif has_cookies:
         # Cookies are present — use android and visionos first, with web as fallback
-        base["extractor_args"] = {"youtube": {"player_client": ["android", "visionos", "web"]}}
+        base["extractor_args"] = {"youtube": {"player_client": ["android", "visionos", "web", "mweb", "ios"]}}
     elif not has_cookies and config.YT_PROXY:
         base["proxy"] = config.YT_PROXY
     elif not has_cookies:
-        base["extractor_args"] = {"youtube": {"player_client": ["android", "visionos"]}}
+        base["extractor_args"] = {"youtube": {"player_client": ["android", "visionos", "web", "mweb", "ios"]}}
 
     return yt_dlp.YoutubeDL({**base, **opts})
 

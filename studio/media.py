@@ -151,15 +151,14 @@ def _ydl(opts):
     if config.YT_OAUTH2 and oauth2_ready() and not has_cookies:
         base["username"] = "oauth2"
         base["password"] = ""
-        base["extractor_args"] = {"youtube": {"player_client": ["android", "visionos", "web", "mweb", "ios"]}}
+        base["extractor_args"] = {"youtube": {"player_client": ["android", "ios"]}}
         has_cookies = True
     elif has_cookies:
-        # Cookies are present — use web and mweb first (which utilize cookies), then android/visionos fallback
-        base["extractor_args"] = {"youtube": {"player_client": ["web", "mweb", "android", "visionos", "ios"]}}
+        base["extractor_args"] = {"youtube": {"player_client": ["android", "ios"]}}
     elif not has_cookies and config.YT_PROXY:
         base["proxy"] = config.YT_PROXY
     elif not has_cookies:
-        base["extractor_args"] = {"youtube": {"player_client": ["web", "mweb", "android", "visionos", "ios"]}}
+        base["extractor_args"] = {"youtube": {"player_client": ["android", "ios"]}}
 
     return yt_dlp.YoutubeDL({**base, **opts})
 
